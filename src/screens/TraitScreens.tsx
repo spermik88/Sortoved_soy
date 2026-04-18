@@ -35,7 +35,17 @@ function subtitle(traitCode: RootStackParamList['TraitOverview']['traitCode'], p
 
 function getTraitFlowVariantKey(
   traitCode: RootStackParamList['TraitOverview']['traitCode'],
-): 'default' | 'flowering_start' | 'flowering_full' {
+):
+  | 'default'
+  | 'flowering_start'
+  | 'flowering_full'
+  | 'flower_color'
+  | 'flowering_end'
+  | 'lateral_leaf_shape'
+  | 'full_maturity'
+  | 'stem_pubescence_color'
+  | 'lodging_resistance'
+  | 'shattering_resistance' {
   return getTraitDefinition(traitCode).flowCopyKey || 'default';
 }
 

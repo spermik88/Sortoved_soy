@@ -9,7 +9,14 @@ export type TraitCode =
   | 'bacteriosis'
   | 'downy_mildew'
   | 'cercospora'
-  | 'aphid_damage';
+  | 'aphid_damage'
+  | 'flower_color'
+  | 'flowering_end'
+  | 'lateral_leaf_shape'
+  | 'full_maturity'
+  | 'stem_pubescence_color'
+  | 'lodging_resistance'
+  | 'shattering_resistance';
 export type TraitState = 'not_started' | 'in_progress' | 'completed';
 export type SyncTaskStatus =
   | 'queued'

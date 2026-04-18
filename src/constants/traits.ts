@@ -8,7 +8,17 @@ export interface TraitDefinition {
   sampleTitle: string;
   inspectionDescription: string;
   isEnabled: boolean;
-  flowCopyKey?: 'default' | 'flowering_start' | 'flowering_full';
+  flowCopyKey?:
+    | 'default'
+    | 'flowering_start'
+    | 'flowering_full'
+    | 'flower_color'
+    | 'flowering_end'
+    | 'lateral_leaf_shape'
+    | 'full_maturity'
+    | 'stem_pubescence_color'
+    | 'lodging_resistance'
+    | 'shattering_resistance';
 }
 
 export const ENABLED_TRAIT_CODES: TraitCode[] = [
@@ -21,6 +31,13 @@ export const ENABLED_TRAIT_CODES: TraitCode[] = [
   'downy_mildew',
   'cercospora',
   'aphid_damage',
+  'flower_color',
+  'flowering_end',
+  'lateral_leaf_shape',
+  'full_maturity',
+  'stem_pubescence_color',
+  'lodging_resistance',
+  'shattering_resistance',
 ];
 
 export const TRAITS: TraitDefinition[] = [
@@ -116,16 +133,86 @@ export const TRAITS: TraitDefinition[] = [
       'Тщательно осмотрите каждое растение на делянке на повреждение тлей. Сделайте фотографию каждого найденного поврежденного растения и укажите его положение.',
     isEnabled: true,
   },
+  {
+    code: 'flower_color',
+    order: 10,
+    title: '10. Цветок: окраска',
+    shortTitle: 'Цветок: окраска',
+    sampleTitle: 'Примеры окраски цветка',
+    inspectionDescription:
+      'Тщательно осмотрите каждое растение на делянке по признаку окраски цветка. Сделайте фотографию каждого найденного растения с окраской цветка и укажите его положение.',
+    isEnabled: true,
+    flowCopyKey: 'flower_color',
+  },
+  {
+    code: 'flowering_end',
+    order: 11,
+    title: '11. Конец цветения',
+    shortTitle: 'Конец цветения',
+    sampleTitle: 'Примеры конца цветения',
+    inspectionDescription:
+      'Тщательно осмотрите каждое растение на делянке на конец цветения. Сделайте фотографию каждого найденного растения с концом цветения и укажите его положение.',
+    isEnabled: true,
+    flowCopyKey: 'flowering_end',
+  },
+  {
+    code: 'lateral_leaf_shape',
+    order: 12,
+    title: '12. Форма бокового листочка',
+    shortTitle: 'Форма бокового листочка',
+    sampleTitle: 'Примеры формы бокового листочка',
+    inspectionDescription:
+      'Тщательно осмотрите каждое растение на делянке по признаку формы бокового листочка. Сделайте фотографию каждого найденного растения с формой бокового листочка и укажите его положение.',
+    isEnabled: true,
+    flowCopyKey: 'lateral_leaf_shape',
+  },
+  {
+    code: 'full_maturity',
+    order: 13,
+    title: '13. Полное созревание',
+    shortTitle: 'Полное созревание',
+    sampleTitle: 'Примеры полного созревания',
+    inspectionDescription:
+      'Тщательно осмотрите каждое растение на делянке на полное созревание. Сделайте фотографию каждого найденного растения с полным созреванием и укажите его положение.',
+    isEnabled: true,
+    flowCopyKey: 'full_maturity',
+  },
+  {
+    code: 'stem_pubescence_color',
+    order: 14,
+    title: '14. Окраска опушения главного стебля',
+    shortTitle: 'Окраска опушения главного стебля',
+    sampleTitle: 'Примеры окраски опушения главного стебля',
+    inspectionDescription:
+      'Тщательно осмотрите каждое растение на делянке по признаку окраски опушения главного стебля. Сделайте фотографию каждого найденного растения с окраской опушения главного стебля и укажите его положение.',
+    isEnabled: true,
+    flowCopyKey: 'stem_pubescence_color',
+  },
+  {
+    code: 'lodging_resistance',
+    order: 15,
+    title: '15. Устойчивость к полеганию',
+    shortTitle: 'Устойчивость к полеганию',
+    sampleTitle: 'Примеры полегания растений',
+    inspectionDescription:
+      'Тщательно осмотрите каждое растение на делянке по признаку полегания. Сделайте фотографию каждого найденного растения с полеганием и укажите его положение.',
+    isEnabled: true,
+    flowCopyKey: 'lodging_resistance',
+  },
+  {
+    code: 'shattering_resistance',
+    order: 16,
+    title: '16. Устойчивость к осыпанию',
+    shortTitle: 'Устойчивость к осыпанию',
+    sampleTitle: 'Примеры осыпания растений',
+    inspectionDescription:
+      'Тщательно осмотрите каждое растение на делянке по признаку осыпания. Сделайте фотографию каждого найденного растения с осыпанием и укажите его положение.',
+    isEnabled: true,
+    flowCopyKey: 'shattering_resistance',
+  },
 ];
 
 export const DISABLED_TRAIT_LABELS = [
-  '10. Цветок: окраска',
-  '11. Конец цветения',
-  '12. Форма бокового листочка',
-  '13. Полное созревание',
-  '14. Окраска опушения главного стебля',
-  '15. Устойчивость к полеганию',
-  '16. Устойчивость к осыпанию',
   '17. Длина стебля',
   '18. Высота прикрепления нижнего боба',
   '19. Количество продуктивных узлов на главном стебле',
@@ -156,5 +243,12 @@ export function createEmptyTraitStatuses(): Record<TraitCode, 'not_started'> {
     downy_mildew: 'not_started',
     cercospora: 'not_started',
     aphid_damage: 'not_started',
+    flower_color: 'not_started',
+    flowering_end: 'not_started',
+    lateral_leaf_shape: 'not_started',
+    full_maturity: 'not_started',
+    stem_pubescence_color: 'not_started',
+    lodging_resistance: 'not_started',
+    shattering_resistance: 'not_started',
   };
 }
