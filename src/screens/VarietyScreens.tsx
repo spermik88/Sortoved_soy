@@ -2,13 +2,25 @@ import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 
+import { DISABLED_TRAIT_LABELS, ENABLED_TRAIT_CODES, TRAITS } from '../constants/traits';
 import { Button, Card, Screen, StatPill, Title } from '../components/Ui';
-import { TRAITS } from '../constants/traits';
 import { colors } from '../constants/theme';
 import { useApp } from '../context/AppContext';
 import { t } from '../i18n';
 import { RootStackParamList } from '../navigation/types';
+import { TraitState } from '../types/app';
 import { getSyncStatusText } from '../utils/syncStatus';
+
+function getAggregateStatusCopy(status: TraitState) {
+  switch (status) {
+    case 'completed':
+      return { label: t('varieties.aggregateDone'), tone: 'success' as const };
+    case 'in_progress':
+      return { label: t('varieties.aggregateProgress'), tone: 'warning' as const };
+    default:
+      return { label: t('varieties.aggregateNotStarted'), tone: 'neutral' as const };
+  }
+}
 
 export function VarietiesScreen({
   navigation,
@@ -50,72 +62,58 @@ export function VarietyDetailScreen({
   navigation,
   route,
 }: NativeStackScreenProps<RootStackParamList, 'VarietyDetail'>) {
-  const {
-    state,
-    getCompletedPlotsCount,
-    getLatestVarietySyncStatus,
-    getNextFusariumPlot,
-  } = useApp();
+  const { state, getAggregateTraitState, getLatestVarietySyncStatus, getNextTraitPlot } = useApp();
   const variety = state.varieties.find((item) => item.id === route.params.varietyId);
 
   if (!variety) {
     return null;
   }
 
-  const completedPlots = getCompletedPlotsCount(variety.id);
-  const latestStatus = getLatestVarietySyncStatus(variety.id);
+  const aggregateState = getAggregateTraitState(variety.id);
+  const aggregateCopy = getAggregateStatusCopy(aggregateState);
+  const latestStatus = ENABLED_TRAIT_CODES.map((traitCode) =>
+    getLatestVarietySyncStatus(traitCode, variety.id),
+  ).find((status) => status !== 'idle') || 'idle';
 
   return (
     <Screen>
       <Title>{variety.title}</Title>
       <Card>
-        <StatPill
-          label={
-            variety.traitStatuses.fusarium === 'completed'
-              ? t('varieties.fusariumDone')
-              : variety.traitStatuses.fusarium === 'in_progress'
-                ? t('varieties.fusariumProgress')
-                : t('varieties.fusariumNotStarted')
-          }
-          tone={
-            variety.traitStatuses.fusarium === 'completed'
-              ? 'success'
-              : variety.traitStatuses.fusarium === 'in_progress'
-                ? 'warning'
-                : 'neutral'
-          }
-        />
-        <Text style={styles.metaText}>
-          {t('varieties.syncedPlots')}: {completedPlots}/3
-        </Text>
+        <StatPill label={aggregateCopy.label} tone={aggregateCopy.tone} />
         <Text style={styles.metaText}>{getSyncStatusText(latestStatus)}</Text>
 
-        {TRAITS.map((trait, index) => {
-          const isFusarium = index === 0;
-          const completed = isFusarium && variety.traitStatuses.fusarium === 'completed';
+        {TRAITS.map((trait) => {
+          const completed = variety.traitStatuses[trait.code] === 'completed';
 
           return (
             <Pressable
-              key={trait}
-              disabled={!isFusarium}
+              key={trait.code}
               onPress={() =>
-                navigation.navigate('FusariumOverview', {
+                navigation.navigate('TraitOverview', {
+                  traitCode: trait.code,
                   varietyId: variety.id,
-                  plotIndex: getNextFusariumPlot(variety.id),
+                  plotIndex: getNextTraitPlot(trait.code, variety.id),
                 })
               }
-              style={[styles.traitRow, !isFusarium && styles.traitRowDisabled]}
+              style={styles.traitRow}
             >
               <Text style={styles.checkbox}>{completed ? '[x]' : '[ ]'}</Text>
               <View style={styles.traitTextWrap}>
-                <Text style={styles.traitText}>{trait}</Text>
-                {!isFusarium ? (
-                  <Text style={styles.traitCaption}>{t('varieties.readyLater')}</Text>
-                ) : null}
+                <Text style={styles.traitText}>{trait.title}</Text>
               </View>
             </Pressable>
           );
         })}
+
+        {DISABLED_TRAIT_LABELS.map((label) => (
+          <Pressable key={label} disabled style={[styles.traitRow, styles.traitRowDisabled]}>
+            <Text style={styles.checkbox}>[ ]</Text>
+            <View style={styles.traitTextWrap}>
+              <Text style={styles.traitText}>{label}</Text>
+              <Text style={styles.traitCaption}>{t('varieties.readyLater')}</Text>
+            </View>
+          </Pressable>
+        ))}
       </Card>
     </Screen>
   );

@@ -1,3 +1,5 @@
+import { TraitCode } from '../types/app';
+
 export type RootStackParamList = {
   RoleSelection: undefined;
   PlaceholderRole: { role: 'analyst' | 'manager' };
@@ -8,7 +10,7 @@ export type RootStackParamList = {
   Varieties: undefined;
   VarietyDetail: { varietyId: string };
   Settings: undefined;
-  FusariumOverview: { varietyId: string; plotIndex: number };
-  FusariumInfections: { varietyId: string; plotIndex: number };
-  FusariumReview: { varietyId: string; plotIndex: number };
+  TraitOverview: { traitCode: TraitCode; varietyId: string; plotIndex: number };
+  TraitInfections: { traitCode: TraitCode; varietyId: string; plotIndex: number };
+  TraitReview: { traitCode: TraitCode; varietyId: string; plotIndex: number };
 };

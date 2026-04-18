@@ -6,7 +6,7 @@ import { AppProvider, useApp } from '../src/context/AppContext';
 
 function Probe() {
   const app = useApp();
-  const draft = app.getFusariumPlotDraft('test-variety', 1);
+  const draft = app.getTraitPlotDraft('fusarium', 'test-variety', 1);
 
   if (!app.hydrated) {
     return <Text>loading</Text>;
@@ -18,15 +18,19 @@ function Probe() {
       <Text testID="mode">{app.state.collectorMode ?? 'none'}</Text>
       <Text testID="varieties">{String(app.state.varieties.length)}</Text>
       <Text testID="infections">{String(draft.infections.length)}</Text>
+      <Text testID="aggregate">{app.getAggregateTraitState('test-variety')}</Text>
       <Button title="collector" onPress={() => app.selectRole('collector')} />
       <Button title="test-mode" onPress={() => app.enableTestMode()} />
-      <Button title="add-card" onPress={() => app.addInfectionCard('test-variety', 1)} />
+      <Button
+        title="add-card"
+        onPress={() => app.addInfectionCard('fusarium', 'test-variety', 1)}
+      />
       <Button
         title="fill-card"
         onPress={() => {
-          const current = app.getFusariumPlotDraft('test-variety', 1).infections[0];
+          const current = app.getTraitPlotDraft('fusarium', 'test-variety', 1).infections[0];
           if (current) {
-            app.updateInfectionCard('test-variety', 1, current.id, {
+            app.updateInfectionCard('fusarium', 'test-variety', 1, current.id, {
               photoUri: 'file:///mock.jpg',
               plantNumber: '5',
               rowNumber: '1',
@@ -61,5 +65,6 @@ describe('AppProvider', () => {
     expect(screen.getByTestId('mode').props.children).toBe('test');
     expect(screen.getByTestId('varieties').props.children).toBe('1');
     expect(screen.getByTestId('infections').props.children).toBe('1');
+    expect(screen.getByTestId('aggregate').props.children).toBe('in_progress');
   });
 });

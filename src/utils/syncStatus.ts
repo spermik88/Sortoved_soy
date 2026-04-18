@@ -1,23 +1,23 @@
 import { t } from '../i18n';
-import { FusariumPlotDraft, SyncTaskStatus } from '../types/app';
+import { SyncTaskStatus, TraitPlotDraft } from '../types/app';
 
 export function getSyncStatusText(
-  status: FusariumPlotDraft['syncStatus'] | SyncTaskStatus | 'idle',
+  status: TraitPlotDraft['syncStatus'] | SyncTaskStatus | 'idle',
 ) {
   switch (status) {
     case 'queued':
-      return t('fusarium.statusQueued');
+      return t('traitFlow.statusQueued');
     case 'waiting_for_network':
-      return t('fusarium.statusWaitingNetwork');
+      return t('traitFlow.statusWaitingNetwork');
     case 'processing':
     case 'syncing':
-      return t('fusarium.statusProcessing');
+      return t('traitFlow.statusProcessing');
     case 'success':
     case 'synced':
-      return t('fusarium.statusSuccess');
+      return t('traitFlow.statusSuccess');
     case 'failed':
-      return t('fusarium.statusFailed');
+      return t('traitFlow.statusFailed');
     default:
-      return t('fusarium.statusIdle');
+      return t('traitFlow.statusIdle');
   }
 }

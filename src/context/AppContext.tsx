@@ -8,6 +8,7 @@ import React, {
   useState,
 } from 'react';
 
+import { ENABLED_TRAIT_CODES, createEmptyTraitStatuses } from '../constants/traits';
 import { collectorRepository } from '../repositories/collectorRepository';
 import { t } from '../i18n';
 import { mockSyncAdapter } from '../services/mockSyncAdapter';
@@ -15,12 +16,14 @@ import { isInternetReachable, subscribeToNetwork } from '../services/networkServ
 import { qrResolver } from '../services/qrResolver';
 import {
   AccountRole,
-  FusariumDraft,
-  FusariumPlotDraft,
   InfectionCard,
   PersistedAppState,
   SyncTask,
   SyncTaskStatus,
+  TraitCode,
+  TraitDraft,
+  TraitPlotDraft,
+  TraitState,
   VarietyLink,
 } from '../types/app';
 import { createId } from '../utils/id';
@@ -38,12 +41,10 @@ const initialState: PersistedAppState = {
   collectorMode: null,
   varieties: [],
   pendingVariety: null,
-  fusariumDrafts: {},
+  traitDrafts: {},
   syncQueue: [],
   syncHistory: [],
 };
-
-const FUSARIUM_CODE = 'fusarium';
 
 function createTestVariety(): VarietyLink {
   return {
@@ -56,9 +57,7 @@ function createTestVariety(): VarietyLink {
       mapsUrl: `https://maps.google.com/?q=test-${plotIndex}`,
       isPlaceholder: true,
     })),
-    traitStatuses: {
-      fusarium: 'not_started',
-    },
+    traitStatuses: createEmptyTraitStatuses(),
   };
 }
 
@@ -66,7 +65,8 @@ function ensureTraitStatuses(variety: VarietyLink): VarietyLink {
   return {
     ...variety,
     traitStatuses: {
-      fusarium: variety.traitStatuses?.fusarium || 'not_started',
+      ...createEmptyTraitStatuses(),
+      ...variety.traitStatuses,
     },
   };
 }
@@ -84,8 +84,40 @@ function ensureTestVariety(state: PersistedAppState): PersistedAppState {
   };
 }
 
-function updateVarietyTraitStatus(state: PersistedAppState, varietyId: string) {
-  const traitState = computeTraitState(state.fusariumDrafts[varietyId]);
+function getTraitDraft(
+  state: PersistedAppState,
+  varietyId: string,
+  traitCode: TraitCode,
+): TraitDraft | undefined {
+  return state.traitDrafts[varietyId]?.[traitCode];
+}
+
+function withUpdatedTraitDraft(
+  state: PersistedAppState,
+  varietyId: string,
+  traitCode: TraitCode,
+  update: (draft: TraitDraft | undefined) => TraitDraft,
+): PersistedAppState {
+  const varietyDrafts = state.traitDrafts[varietyId] || {};
+
+  return {
+    ...state,
+    traitDrafts: {
+      ...state.traitDrafts,
+      [varietyId]: {
+        ...varietyDrafts,
+        [traitCode]: update(varietyDrafts[traitCode]),
+      },
+    },
+  };
+}
+
+function updateVarietyTraitStatus(
+  state: PersistedAppState,
+  varietyId: string,
+  traitCode: TraitCode,
+): PersistedAppState {
+  const traitState = computeTraitState(getTraitDraft(state, varietyId, traitCode));
 
   return {
     ...state,
@@ -95,7 +127,7 @@ function updateVarietyTraitStatus(state: PersistedAppState, varietyId: string) {
             ...variety,
             traitStatuses: {
               ...variety.traitStatuses,
-              [FUSARIUM_CODE]: traitState,
+              [traitCode]: traitState,
             },
           }
         : variety,
@@ -112,22 +144,34 @@ interface AppContextValue {
   scanQr: (rawValue: string) => { duplicate: boolean; invalid?: string };
   confirmPendingVariety: () => void;
   clearPendingVariety: () => void;
-  saveOverviewPhoto: (varietyId: string, plotIndex: number, uri: string) => void;
-  addInfectionCard: (varietyId: string, plotIndex: number) => void;
+  saveOverviewPhoto: (traitCode: TraitCode, varietyId: string, plotIndex: number, uri: string) => void;
+  addInfectionCard: (traitCode: TraitCode, varietyId: string, plotIndex: number) => void;
   updateInfectionCard: (
+    traitCode: TraitCode,
     varietyId: string,
     plotIndex: number,
     cardId: string,
     changes: Partial<InfectionCard>,
   ) => void;
-  removeInfectionCard: (varietyId: string, plotIndex: number, cardId: string) => void;
-  confirmFusariumPlot: (varietyId: string, plotIndex: number) => Promise<'synced' | 'queued'>;
-  getFusariumPlotDraft: (varietyId: string, plotIndex: number) => FusariumPlotDraft;
-  getNextFusariumPlot: (varietyId: string) => number;
-  getCompletedPlotsCount: (varietyId: string) => number;
-  getLatestVarietySyncStatus: (
+  removeInfectionCard: (
+    traitCode: TraitCode,
     varietyId: string,
-  ) => FusariumPlotDraft['syncStatus'] | SyncTaskStatus | 'idle';
+    plotIndex: number,
+    cardId: string,
+  ) => void;
+  confirmTraitPlot: (
+    traitCode: TraitCode,
+    varietyId: string,
+    plotIndex: number,
+  ) => Promise<'synced' | 'queued'>;
+  getTraitPlotDraft: (traitCode: TraitCode, varietyId: string, plotIndex: number) => TraitPlotDraft;
+  getNextTraitPlot: (traitCode: TraitCode, varietyId: string) => number;
+  getCompletedPlotsCount: (traitCode: TraitCode, varietyId: string) => number;
+  getLatestVarietySyncStatus: (
+    traitCode: TraitCode,
+    varietyId: string,
+  ) => TraitPlotDraft['syncStatus'] | SyncTaskStatus | 'idle';
+  getAggregateTraitState: (varietyId: string) => TraitState;
 }
 
 const AppContext = createContext<AppContextValue | undefined>(undefined);
@@ -146,6 +190,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       if (stored) {
         setState({
           ...stored,
+          traitDrafts: stored.traitDrafts || {},
           varieties: stored.varieties.map(ensureTraitStatuses),
         });
       }
@@ -172,25 +217,27 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
     if (!isOnline) {
       setState((current) => {
-        const nextState = {
-          ...current,
-          fusariumDrafts: {
-            ...current.fusariumDrafts,
-            [taskSnapshot.varietyId]: {
-              ...current.fusariumDrafts[taskSnapshot.varietyId],
-              plots: {
-                ...current.fusariumDrafts[taskSnapshot.varietyId].plots,
-                [String(taskSnapshot.plotIndex)]: {
-                  ...current.fusariumDrafts[taskSnapshot.varietyId].plots[
-                    String(taskSnapshot.plotIndex)
-                  ],
-                  syncStatus: 'queued' as const,
-                  lastQueuedAt: now,
-                },
+        const nextState = withUpdatedTraitDraft(
+          current,
+          taskSnapshot.varietyId,
+          taskSnapshot.traitCode,
+          (draft) => ({
+            varietyId: taskSnapshot.varietyId,
+            traitCode: taskSnapshot.traitCode,
+            lastUpdated: now,
+            plots: {
+              ...draft?.plots,
+              [String(taskSnapshot.plotIndex)]: {
+                ...getOrCreatePlotDraft(draft, taskSnapshot.plotIndex),
+                syncStatus: 'queued',
+                lastQueuedAt: now,
               },
-              lastUpdated: now,
             },
-          },
+          }),
+        );
+
+        const queuedState = {
+          ...nextState,
           syncQueue: current.syncQueue.map((task) =>
             task.id === taskId
               ? { ...task, status: 'waiting_for_network' as const, updatedAt: now }
@@ -198,30 +245,36 @@ export function AppProvider({ children }: { children: ReactNode }) {
           ),
         };
 
-        return updateVarietyTraitStatus(nextState, taskSnapshot.varietyId);
+        return updateVarietyTraitStatus(
+          queuedState,
+          taskSnapshot.varietyId,
+          taskSnapshot.traitCode,
+        );
       });
       return 'queued';
     }
 
     setState((current) => {
-      const nextState = {
-        ...current,
-        fusariumDrafts: {
-          ...current.fusariumDrafts,
-          [taskSnapshot.varietyId]: {
-            ...current.fusariumDrafts[taskSnapshot.varietyId],
-            plots: {
-              ...current.fusariumDrafts[taskSnapshot.varietyId].plots,
-              [String(taskSnapshot.plotIndex)]: {
-                ...current.fusariumDrafts[taskSnapshot.varietyId].plots[
-                  String(taskSnapshot.plotIndex)
-                ],
-                syncStatus: 'syncing' as const,
-              },
+      const nextState = withUpdatedTraitDraft(
+        current,
+        taskSnapshot.varietyId,
+        taskSnapshot.traitCode,
+        (draft) => ({
+          varietyId: taskSnapshot.varietyId,
+          traitCode: taskSnapshot.traitCode,
+          lastUpdated: now,
+          plots: {
+            ...draft?.plots,
+            [String(taskSnapshot.plotIndex)]: {
+              ...getOrCreatePlotDraft(draft, taskSnapshot.plotIndex),
+              syncStatus: 'syncing',
             },
-            lastUpdated: now,
           },
-        },
+        }),
+      );
+
+      const processingState = {
+        ...nextState,
         syncQueue: current.syncQueue.map((task) =>
           task.id === taskId
             ? { ...task, status: 'processing' as const, updatedAt: now }
@@ -229,7 +282,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
         ),
       };
 
-      return updateVarietyTraitStatus(nextState, taskSnapshot.varietyId);
+      return updateVarietyTraitStatus(
+        processingState,
+        taskSnapshot.varietyId,
+        taskSnapshot.traitCode,
+      );
     });
 
     await mockSyncAdapter.process(taskSnapshot);
@@ -241,37 +298,43 @@ export function AppProvider({ children }: { children: ReactNode }) {
         return current;
       }
 
-      const nextState = {
-        ...current,
-        fusariumDrafts: {
-          ...current.fusariumDrafts,
-          [completedTask.varietyId]: {
-            ...current.fusariumDrafts[completedTask.varietyId],
-            plots: {
-              ...current.fusariumDrafts[completedTask.varietyId].plots,
-              [String(completedTask.plotIndex)]: {
-                ...current.fusariumDrafts[completedTask.varietyId].plots[
-                  String(completedTask.plotIndex)
-                ],
-                syncStatus: 'synced' as const,
-                lastSyncAt: new Date().toISOString(),
-              },
+      const nextState = withUpdatedTraitDraft(
+        current,
+        completedTask.varietyId,
+        completedTask.traitCode,
+        (draft) => ({
+          varietyId: completedTask.varietyId,
+          traitCode: completedTask.traitCode,
+          lastUpdated: new Date().toISOString(),
+          plots: {
+            ...draft?.plots,
+            [String(completedTask.plotIndex)]: {
+              ...getOrCreatePlotDraft(draft, completedTask.plotIndex),
+              syncStatus: 'synced',
+              lastSyncAt: new Date().toISOString(),
             },
-            lastUpdated: new Date().toISOString(),
           },
-        },
+        }),
+      );
+
+      const completedState = {
+        ...nextState,
         syncQueue: current.syncQueue.filter((task) => task.id !== taskId),
         syncHistory: [
-            {
-              ...completedTask,
-              status: 'success' as const,
-              updatedAt: new Date().toISOString(),
-            },
+          {
+            ...completedTask,
+            status: 'success' as const,
+            updatedAt: new Date().toISOString(),
+          },
           ...current.syncHistory,
         ],
       };
 
-      return updateVarietyTraitStatus(nextState, completedTask.varietyId);
+      return updateVarietyTraitStatus(
+        completedState,
+        completedTask.varietyId,
+        completedTask.traitCode,
+      );
     });
 
     return 'synced';
@@ -385,9 +448,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
                 title: current.pendingVariety.title,
                 sourceMode: 'linked',
                 plotPhotos: current.pendingVariety.plotPhotos,
-                traitStatuses: {
-                  fusarium: 'not_started',
-                },
+                traitStatuses: createEmptyTraitStatuses(),
               },
             ],
           };
@@ -399,35 +460,26 @@ export function AppProvider({ children }: { children: ReactNode }) {
           pendingVariety: null,
         }));
       },
-      saveOverviewPhoto(varietyId, plotIndex, uri) {
+      saveOverviewPhoto(traitCode, varietyId, plotIndex, uri) {
         setState((current) => {
-          const draft = current.fusariumDrafts[varietyId];
-          const plotDraft = getOrCreatePlotDraft(draft, plotIndex);
-          const nextState = {
-            ...current,
-            fusariumDrafts: {
-              ...current.fusariumDrafts,
-              [varietyId]: {
-                varietyId,
-                lastUpdated: new Date().toISOString(),
-                plots: {
-                  ...draft?.plots,
-                  [String(plotIndex)]: {
-                    ...plotDraft,
-                    overviewPhoto: uri,
-                  },
-                },
+          const nextState = withUpdatedTraitDraft(current, varietyId, traitCode, (draft) => ({
+            varietyId,
+            traitCode,
+            lastUpdated: new Date().toISOString(),
+            plots: {
+              ...draft?.plots,
+              [String(plotIndex)]: {
+                ...getOrCreatePlotDraft(draft, plotIndex),
+                overviewPhoto: uri,
               },
             },
-          };
+          }));
 
-          return updateVarietyTraitStatus(nextState, varietyId);
+          return updateVarietyTraitStatus(nextState, varietyId, traitCode);
         });
       },
-      addInfectionCard(varietyId, plotIndex) {
+      addInfectionCard(traitCode, varietyId, plotIndex) {
         setState((current) => {
-          const draft = current.fusariumDrafts[varietyId];
-          const plotDraft = getOrCreatePlotDraft(draft, plotIndex);
           const card: InfectionCard = {
             id: createId('infection'),
             plantNumber: '',
@@ -435,100 +487,89 @@ export function AppProvider({ children }: { children: ReactNode }) {
             isComplete: false,
           };
 
-          const nextState = {
-            ...current,
-            fusariumDrafts: {
-              ...current.fusariumDrafts,
-              [varietyId]: {
-                varietyId,
-                lastUpdated: new Date().toISOString(),
-                plots: {
-                  ...draft?.plots,
-                  [String(plotIndex)]: {
-                    ...plotDraft,
-                    infections: [...plotDraft.infections, card],
-                  },
-                },
+          const nextState = withUpdatedTraitDraft(current, varietyId, traitCode, (draft) => ({
+            varietyId,
+            traitCode,
+            lastUpdated: new Date().toISOString(),
+            plots: {
+              ...draft?.plots,
+              [String(plotIndex)]: {
+                ...getOrCreatePlotDraft(draft, plotIndex),
+                infections: [...getOrCreatePlotDraft(draft, plotIndex).infections, card],
               },
             },
-          };
+          }));
 
-          return updateVarietyTraitStatus(nextState, varietyId);
+          return updateVarietyTraitStatus(nextState, varietyId, traitCode);
         });
       },
-      updateInfectionCard(varietyId, plotIndex, cardId, changes) {
+      updateInfectionCard(traitCode, varietyId, plotIndex, cardId, changes) {
         setState((current) => {
-          const draft = current.fusariumDrafts[varietyId];
-          const plotDraft = getOrCreatePlotDraft(draft, plotIndex);
+          const nextState = withUpdatedTraitDraft(current, varietyId, traitCode, (draft) => {
+            const plotDraft = getOrCreatePlotDraft(draft, plotIndex);
 
-          const nextState = {
-            ...current,
-            fusariumDrafts: {
-              ...current.fusariumDrafts,
-              [varietyId]: {
-                varietyId,
-                lastUpdated: new Date().toISOString(),
-                plots: {
-                  ...draft?.plots,
-                  [String(plotIndex)]: {
-                    ...plotDraft,
-                    infections: plotDraft.infections.map((card) => {
-                      if (card.id !== cardId) {
-                        return card;
-                      }
+            return {
+              varietyId,
+              traitCode,
+              lastUpdated: new Date().toISOString(),
+              plots: {
+                ...draft?.plots,
+                [String(plotIndex)]: {
+                  ...plotDraft,
+                  infections: plotDraft.infections.map((card) => {
+                    if (card.id !== cardId) {
+                      return card;
+                    }
 
-                      const nextCard = {
-                        ...card,
-                        ...changes,
-                      };
+                    const nextCard = {
+                      ...card,
+                      ...changes,
+                    };
 
-                      return {
-                        ...nextCard,
-                        isComplete: isInfectionCardComplete(nextCard),
-                      };
-                    }),
-                  },
+                    return {
+                      ...nextCard,
+                      isComplete: isInfectionCardComplete(nextCard),
+                    };
+                  }),
                 },
               },
-            },
-          };
+            };
+          });
 
-          return updateVarietyTraitStatus(nextState, varietyId);
+          return updateVarietyTraitStatus(nextState, varietyId, traitCode);
         });
       },
-      removeInfectionCard(varietyId, plotIndex, cardId) {
+      removeInfectionCard(traitCode, varietyId, plotIndex, cardId) {
         setState((current) => {
-          const draft = current.fusariumDrafts[varietyId];
-          const plotDraft = getOrCreatePlotDraft(draft, plotIndex);
-          const nextState = {
-            ...current,
-            fusariumDrafts: {
-              ...current.fusariumDrafts,
-              [varietyId]: {
-                varietyId,
-                lastUpdated: new Date().toISOString(),
-                plots: {
-                  ...draft?.plots,
-                  [String(plotIndex)]: {
-                    ...plotDraft,
-                    infections: plotDraft.infections.filter((card) => card.id !== cardId),
-                  },
+          const nextState = withUpdatedTraitDraft(current, varietyId, traitCode, (draft) => {
+            const plotDraft = getOrCreatePlotDraft(draft, plotIndex);
+
+            return {
+              varietyId,
+              traitCode,
+              lastUpdated: new Date().toISOString(),
+              plots: {
+                ...draft?.plots,
+                [String(plotIndex)]: {
+                  ...plotDraft,
+                  infections: plotDraft.infections.filter((card) => card.id !== cardId),
                 },
               },
-            },
-          };
+            };
+          });
 
-          return updateVarietyTraitStatus(nextState, varietyId);
+          return updateVarietyTraitStatus(nextState, varietyId, traitCode);
         });
       },
-      async confirmFusariumPlot(varietyId, plotIndex) {
-        const draft = stateRef.current.fusariumDrafts[varietyId];
+      async confirmTraitPlot(traitCode, varietyId, plotIndex) {
+        const draft = getTraitDraft(stateRef.current, varietyId, traitCode);
         const plotDraft = getOrCreatePlotDraft(draft, plotIndex);
         const taskId = createId('sync');
         const now = new Date().toISOString();
         const task: SyncTask = {
           id: taskId,
-          type: 'fusarium_plot',
+          type: 'trait_plot',
+          traitCode,
           varietyId,
           plotIndex,
           payload: {
@@ -543,35 +584,35 @@ export function AppProvider({ children }: { children: ReactNode }) {
         };
 
         setState((current) => {
-          const nextState = {
-            ...current,
-            fusariumDrafts: {
-              ...current.fusariumDrafts,
-              [varietyId]: {
-                ...current.fusariumDrafts[varietyId],
-                plots: {
-                  ...current.fusariumDrafts[varietyId].plots,
-                  [String(plotIndex)]: {
-                    ...current.fusariumDrafts[varietyId].plots[String(plotIndex)],
-                    syncStatus: 'queued' as const,
-                    lastQueuedAt: now,
-                  },
-                },
+          const nextState = withUpdatedTraitDraft(current, varietyId, traitCode, (currentDraft) => ({
+            varietyId,
+            traitCode,
+            lastUpdated: now,
+            plots: {
+              ...currentDraft?.plots,
+              [String(plotIndex)]: {
+                ...getOrCreatePlotDraft(currentDraft, plotIndex),
+                syncStatus: 'queued',
+                lastQueuedAt: now,
               },
             },
+          }));
+
+          const queuedState = {
+            ...nextState,
             syncQueue: [task, ...current.syncQueue],
           };
 
-          return updateVarietyTraitStatus(nextState, varietyId);
+          return updateVarietyTraitStatus(queuedState, varietyId, traitCode);
         });
 
         return processTask(taskId);
       },
-      getFusariumPlotDraft(varietyId, plotIndex) {
-        return getOrCreatePlotDraft(state.fusariumDrafts[varietyId], plotIndex);
+      getTraitPlotDraft(traitCode, varietyId, plotIndex) {
+        return getOrCreatePlotDraft(getTraitDraft(state, varietyId, traitCode), plotIndex);
       },
-      getNextFusariumPlot(varietyId) {
-        const plots = state.fusariumDrafts[varietyId]?.plots || {};
+      getNextTraitPlot(traitCode, varietyId) {
+        const plots = getTraitDraft(state, varietyId, traitCode)?.plots || {};
 
         for (const plotIndex of [1, 2, 3]) {
           if (plots[String(plotIndex)]?.syncStatus !== 'synced') {
@@ -581,11 +622,29 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
         return 1;
       },
-      getCompletedPlotsCount(varietyId) {
-        return countCompletedPlots(state.fusariumDrafts[varietyId]);
+      getCompletedPlotsCount(traitCode, varietyId) {
+        return countCompletedPlots(getTraitDraft(state, varietyId, traitCode));
       },
-      getLatestVarietySyncStatus(varietyId) {
-        return getLatestPlotStatus(state.fusariumDrafts[varietyId]);
+      getLatestVarietySyncStatus(traitCode, varietyId) {
+        return getLatestPlotStatus(getTraitDraft(state, varietyId, traitCode));
+      },
+      getAggregateTraitState(varietyId) {
+        const variety = state.varieties.find((item) => item.id === varietyId);
+        if (!variety) {
+          return 'not_started';
+        }
+
+        const activeStatuses = ENABLED_TRAIT_CODES.map((code) => variety.traitStatuses[code]);
+
+        if (activeStatuses.every((status) => status === 'completed')) {
+          return 'completed';
+        }
+
+        if (activeStatuses.every((status) => status === 'not_started')) {
+          return 'not_started';
+        }
+
+        return 'in_progress';
       },
     }),
     [hydrated, state],

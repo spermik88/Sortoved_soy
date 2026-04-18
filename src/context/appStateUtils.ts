@@ -1,9 +1,15 @@
-import { FusariumDraft, FusariumPlotDraft, SyncTaskStatus, TraitState } from '../types/app';
+import {
+  SyncTaskStatus,
+  TraitCode,
+  TraitDraft,
+  TraitPlotDraft,
+  TraitState,
+} from '../types/app';
 
 export function getOrCreatePlotDraft(
-  draft: FusariumDraft | undefined,
+  draft: TraitDraft | undefined,
   plotIndex: number,
-): FusariumPlotDraft {
+): TraitPlotDraft {
   return (
     draft?.plots[String(plotIndex)] || {
       plotIndex,
@@ -21,7 +27,7 @@ export function isInfectionCardComplete(card: {
   return Boolean(card.photoUri && card.plantNumber.trim() && card.rowNumber.trim());
 }
 
-export function computeTraitState(draft: FusariumDraft | undefined): TraitState {
+export function computeTraitState(draft: TraitDraft | undefined): TraitState {
   if (!draft) {
     return 'not_started';
   }
@@ -34,7 +40,24 @@ export function computeTraitState(draft: FusariumDraft | undefined): TraitState 
   return 'in_progress';
 }
 
-export function getCompletedPlotsCount(draft: FusariumDraft | undefined) {
+export function computeAggregateTraitState(
+  statuses: Record<TraitCode, TraitState>,
+  activeCodes: TraitCode[],
+): TraitState {
+  const activeStatuses = activeCodes.map((code) => statuses[code]);
+
+  if (activeStatuses.every((status) => status === 'completed')) {
+    return 'completed';
+  }
+
+  if (activeStatuses.every((status) => status === 'not_started')) {
+    return 'not_started';
+  }
+
+  return 'in_progress';
+}
+
+export function getCompletedPlotsCount(draft: TraitDraft | undefined) {
   if (!draft) {
     return 0;
   }
@@ -43,8 +66,8 @@ export function getCompletedPlotsCount(draft: FusariumDraft | undefined) {
 }
 
 export function getLatestPlotStatus(
-  draft: FusariumDraft | undefined,
-): FusariumPlotDraft['syncStatus'] | SyncTaskStatus | 'idle' {
+  draft: TraitDraft | undefined,
+): TraitPlotDraft['syncStatus'] | SyncTaskStatus | 'idle' {
   if (!draft) {
     return 'idle';
   }

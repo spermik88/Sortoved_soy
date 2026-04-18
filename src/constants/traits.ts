@@ -1,13 +1,101 @@
-export const TRAITS = [
-  '1. Фузариоз',
-  '2. Септориоз',
-  '3. Повреждение блошкой',
+import { TraitCode } from '../types/app';
+
+export interface TraitDefinition {
+  code: TraitCode;
+  order: number;
+  title: string;
+  shortTitle: string;
+  sampleTitle: string;
+  inspectionDescription: string;
+  isEnabled: boolean;
+}
+
+export const ENABLED_TRAIT_CODES: TraitCode[] = [
+  'fusarium',
+  'septoria',
+  'flea_damage',
+  'bacteriosis',
+  'downy_mildew',
+  'cercospora',
+  'aphid_damage',
+];
+
+export const TRAITS: TraitDefinition[] = [
+  {
+    code: 'fusarium',
+    order: 1,
+    title: '1. Фузариоз',
+    shortTitle: 'Фузариоз',
+    sampleTitle: 'Примеры заражения фузариозом',
+    inspectionDescription:
+      'Тщательно осмотрите каждое растение на делянке на заражение фузариозом. Сделайте фотографию каждого найденного заболевшего растения и укажите его положение.',
+    isEnabled: true,
+  },
+  {
+    code: 'septoria',
+    order: 2,
+    title: '2. Септориоз',
+    shortTitle: 'Септориоз',
+    sampleTitle: 'Примеры заражения септориозом',
+    inspectionDescription:
+      'Тщательно осмотрите каждое растение на делянке на заражение септориозом. Сделайте фотографию каждого найденного заболевшего растения и укажите его положение.',
+    isEnabled: true,
+  },
+  {
+    code: 'flea_damage',
+    order: 3,
+    title: '3. Повреждение блошкой',
+    shortTitle: 'Повреждение блошкой',
+    sampleTitle: 'Примеры повреждения растений блошкой',
+    inspectionDescription:
+      'Тщательно осмотрите каждое растение на делянке на повреждение блошкой. Сделайте фотографию каждого найденного поврежденного растения и укажите его положение.',
+    isEnabled: true,
+  },
+  {
+    code: 'bacteriosis',
+    order: 6,
+    title: '6. Бактериоз',
+    shortTitle: 'Бактериоз',
+    sampleTitle: 'Примеры заражения бактериозом',
+    inspectionDescription:
+      'Тщательно осмотрите каждое растение на делянке на заражение бактериозом. Сделайте фотографию каждого найденного заболевшего растения и укажите его положение.',
+    isEnabled: true,
+  },
+  {
+    code: 'downy_mildew',
+    order: 7,
+    title: '7. Пероноспороз',
+    shortTitle: 'Пероноспороз',
+    sampleTitle: 'Примеры заражения пероноспорозом',
+    inspectionDescription:
+      'Тщательно осмотрите каждое растение на делянке на заражение пероноспорозом. Сделайте фотографию каждого найденного заболевшего растения и укажите его положение.',
+    isEnabled: true,
+  },
+  {
+    code: 'cercospora',
+    order: 8,
+    title: '8. Церкоспороз',
+    shortTitle: 'Церкоспороз',
+    sampleTitle: 'Примеры заражения церкоспорозом',
+    inspectionDescription:
+      'Тщательно осмотрите каждое растение на делянке на заражение церкоспорозом. Сделайте фотографию каждого найденного заболевшего растения и укажите его положение.',
+    isEnabled: true,
+  },
+  {
+    code: 'aphid_damage',
+    order: 9,
+    title: '9. Повреждение тлей',
+    shortTitle: 'Повреждение тлей',
+    sampleTitle: 'Примеры повреждения растений тлей',
+    inspectionDescription:
+      'Тщательно осмотрите каждое растение на делянке на повреждение тлей. Сделайте фотографию каждого найденного поврежденного растения и укажите его положение.',
+    isEnabled: true,
+  },
+];
+
+export const DISABLED_TRAIT_LABELS = [
   '4. Начало цветения',
   '5. Полное цветение',
-  '6. Бактериоз',
-  '7. Пероноспороз',
-  '8. Церкоспороз',
-  '9. Повреждение тлей',
   '10. Цветок: окраска',
   '11. Конец цветения',
   '12. Форма бокового листочка',
@@ -29,3 +117,19 @@ export const TRAITS = [
   '28. Содержание белка',
   '29. Содержание жира',
 ] as const;
+
+export function getTraitDefinition(traitCode: TraitCode) {
+  return TRAITS.find((trait) => trait.code === traitCode)!;
+}
+
+export function createEmptyTraitStatuses(): Record<TraitCode, 'not_started'> {
+  return {
+    fusarium: 'not_started',
+    septoria: 'not_started',
+    flea_damage: 'not_started',
+    bacteriosis: 'not_started',
+    downy_mildew: 'not_started',
+    cercospora: 'not_started',
+    aphid_damage: 'not_started',
+  };
+}

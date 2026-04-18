@@ -1,6 +1,13 @@
 export type AccountRole = 'collector' | 'analyst' | 'manager';
 export type CollectorMode = 'linked' | 'test';
-export type TraitCode = 'fusarium';
+export type TraitCode =
+  | 'fusarium'
+  | 'septoria'
+  | 'flea_damage'
+  | 'bacteriosis'
+  | 'downy_mildew'
+  | 'cercospora'
+  | 'aphid_damage';
 export type TraitState = 'not_started' | 'in_progress' | 'completed';
 export type SyncTaskStatus =
   | 'queued'
@@ -24,7 +31,7 @@ export interface InfectionCard {
   isComplete: boolean;
 }
 
-export interface FusariumPlotDraft {
+export interface TraitPlotDraft {
   plotIndex: number;
   overviewPhoto?: string;
   infections: InfectionCard[];
@@ -33,11 +40,14 @@ export interface FusariumPlotDraft {
   lastQueuedAt?: string;
 }
 
-export interface FusariumDraft {
+export interface TraitDraft {
   varietyId: string;
-  plots: Record<string, FusariumPlotDraft>;
+  traitCode: TraitCode;
+  plots: Record<string, TraitPlotDraft>;
   lastUpdated: string;
 }
+
+export type TraitDraftMap = Partial<Record<TraitCode, TraitDraft>>;
 
 export interface VarietyLink {
   id: string;
@@ -50,10 +60,11 @@ export interface VarietyLink {
 
 export interface SyncTask {
   id: string;
-  type: 'fusarium_plot';
+  type: 'trait_plot';
+  traitCode: TraitCode;
   varietyId: string;
   plotIndex: number;
-  payload: FusariumPlotDraft;
+  payload: TraitPlotDraft;
   status: SyncTaskStatus;
   retryCount: number;
   createdAt: string;
@@ -73,7 +84,7 @@ export interface PersistedAppState {
   collectorMode: CollectorMode | null;
   varieties: VarietyLink[];
   pendingVariety: PendingVariety | null;
-  fusariumDrafts: Record<string, FusariumDraft>;
+  traitDrafts: Record<string, TraitDraftMap>;
   syncQueue: SyncTask[];
   syncHistory: SyncTask[];
 }

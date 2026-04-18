@@ -6,10 +6,10 @@ import { LoadingBlock } from '../components/Ui';
 import { useApp } from '../context/AppContext';
 import { t } from '../i18n';
 import {
-  FusariumInfectionsScreen,
-  FusariumOverviewScreen,
-  FusariumReviewScreen,
-} from '../screens/FusariumScreens';
+  TraitInfectionsScreen,
+  TraitOverviewScreen,
+  TraitReviewScreen,
+} from '../screens/TraitScreens';
 import {
   MainMenuScreen,
   QrValidationScreen,
@@ -68,9 +68,9 @@ export function AppNavigator() {
         <Stack.Screen name="Varieties" component={VarietiesScreen} />
         <Stack.Screen name="VarietyDetail" component={VarietyDetailScreen} />
         <Stack.Screen name="Settings" component={SettingsScreen} />
-        <Stack.Screen name="FusariumOverview" component={FusariumOverviewScreen} />
-        <Stack.Screen name="FusariumInfections" component={FusariumInfectionsScreen} />
-        <Stack.Screen name="FusariumReview" component={FusariumReviewScreen} />
+        <Stack.Screen name="TraitOverview" component={TraitOverviewScreen} />
+        <Stack.Screen name="TraitInfections" component={TraitInfectionsScreen} />
+        <Stack.Screen name="TraitReview" component={TraitReviewScreen} />
       </Stack.Navigator>
     </NavigationContainer>
   );

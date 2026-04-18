@@ -18,13 +18,22 @@ jest.mock('../src/context/AppContext', () => ({
           sheetUrl: 'https://example.com',
           sourceMode: 'test',
           plotPhotos: [],
-          traitStatuses: { fusarium: 'in_progress' },
+          traitStatuses: {
+            fusarium: 'completed',
+            septoria: 'completed',
+            flea_damage: 'completed',
+            bacteriosis: 'completed',
+            downy_mildew: 'completed',
+            cercospora: 'completed',
+            aphid_damage: 'in_progress',
+          },
         },
       ],
     },
-    getNextFusariumPlot: () => 2,
+    getNextTraitPlot: () => 2,
     getCompletedPlotsCount: () => 1,
     getLatestVarietySyncStatus: () => 'queued',
+    getAggregateTraitState: () => 'in_progress',
   }),
 }));
 
@@ -47,7 +56,7 @@ describe('collector flow smoke', () => {
     expect(screen.getByText('Тестовый режим')).toBeTruthy();
   });
 
-  it('renders variety detail status', () => {
+  it('renders aggregate variety detail status', () => {
     const screen = render(
       <VarietyDetailScreen
         navigation={{ navigate: jest.fn() } as never}
@@ -56,6 +65,8 @@ describe('collector flow smoke', () => {
     );
 
     expect(screen.getByText('Соя 3')).toBeTruthy();
-    expect(screen.getByText('Фузариоз в работе')).toBeTruthy();
+    expect(screen.getByText('Активные ходы в работе')).toBeTruthy();
+    expect(screen.getByText('2. Септориоз')).toBeTruthy();
+    expect(screen.getByText('9. Повреждение тлей')).toBeTruthy();
   });
 });

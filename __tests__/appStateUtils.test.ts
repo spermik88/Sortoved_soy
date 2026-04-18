@@ -1,11 +1,12 @@
 import {
+  computeAggregateTraitState,
   computeTraitState,
   getCompletedPlotsCount,
   getLatestPlotStatus,
   getOrCreatePlotDraft,
   isInfectionCardComplete,
 } from '../src/context/appStateUtils';
-import { FusariumDraft } from '../src/types/app';
+import { TraitDraft } from '../src/types/app';
 
 describe('appStateUtils', () => {
   it('creates empty plot draft by default', () => {
@@ -35,8 +36,9 @@ describe('appStateUtils', () => {
   });
 
   it('computes completed trait state for three synced plots', () => {
-    const draft: FusariumDraft = {
+    const draft: TraitDraft = {
       varietyId: 'v1',
+      traitCode: 'fusarium',
       lastUpdated: '2026-04-18T00:00:00.000Z',
       plots: {
         '1': { plotIndex: 1, infections: [], syncStatus: 'synced' },
@@ -50,8 +52,9 @@ describe('appStateUtils', () => {
   });
 
   it('derives latest status from timestamps', () => {
-    const draft: FusariumDraft = {
+    const draft: TraitDraft = {
       varietyId: 'v1',
+      traitCode: 'fusarium',
       lastUpdated: '2026-04-18T00:00:00.000Z',
       plots: {
         '1': {
@@ -70,5 +73,53 @@ describe('appStateUtils', () => {
     };
 
     expect(getLatestPlotStatus(draft)).toBe('synced');
+  });
+
+  it('computes aggregate trait state across active flows', () => {
+    expect(
+      computeAggregateTraitState(
+        {
+          fusarium: 'not_started',
+          septoria: 'not_started',
+          flea_damage: 'not_started',
+          bacteriosis: 'not_started',
+          downy_mildew: 'not_started',
+          cercospora: 'not_started',
+          aphid_damage: 'not_started',
+        },
+        [
+          'fusarium',
+          'septoria',
+          'flea_damage',
+          'bacteriosis',
+          'downy_mildew',
+          'cercospora',
+          'aphid_damage',
+        ],
+      ),
+    ).toBe('not_started');
+
+    expect(
+      computeAggregateTraitState(
+        {
+          fusarium: 'completed',
+          septoria: 'completed',
+          flea_damage: 'completed',
+          bacteriosis: 'completed',
+          downy_mildew: 'completed',
+          cercospora: 'completed',
+          aphid_damage: 'in_progress',
+        },
+        [
+          'fusarium',
+          'septoria',
+          'flea_damage',
+          'bacteriosis',
+          'downy_mildew',
+          'cercospora',
+          'aphid_damage',
+        ],
+      ),
+    ).toBe('in_progress');
   });
 });
