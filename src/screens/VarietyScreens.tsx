@@ -2,7 +2,7 @@ import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 
-import { DISABLED_TRAIT_LABELS, ENABLED_TRAIT_CODES, TRAITS } from '../constants/traits';
+import { ENABLED_TRAIT_CODES, TRAITS } from '../constants/traits';
 import { Button, Card, Screen, StatPill, Title } from '../components/Ui';
 import { colors } from '../constants/theme';
 import { useApp } from '../context/AppContext';
@@ -100,13 +100,22 @@ export function VarietyDetailScreen({
           return (
             <Pressable
               key={trait.code}
-              onPress={() =>
+              onPress={() => {
+                if (trait.flowKind === 'measurement_ab_flow') {
+                  navigation.navigate('MeasurementTraitFlow', {
+                    traitCode: trait.code,
+                    varietyId: variety.id,
+                    step: 1,
+                  });
+                  return;
+                }
+
                 navigation.navigate('TraitOverview', {
                   traitCode: trait.code,
                   varietyId: variety.id,
                   plotIndex: getNextTraitPlot(trait.code, variety.id),
-                })
-              }
+                });
+              }}
               style={styles.traitRow}
             >
               <Text style={styles.checkbox}>{checkbox}</Text>
@@ -116,16 +125,6 @@ export function VarietyDetailScreen({
             </Pressable>
           );
         })}
-
-        {DISABLED_TRAIT_LABELS.map((label) => (
-          <Pressable key={label} disabled style={[styles.traitRow, styles.traitRowDisabled]}>
-            <Text style={styles.checkbox}>[ ]</Text>
-            <View style={styles.traitTextWrap}>
-              <Text style={styles.traitText}>{label}</Text>
-              <Text style={styles.traitCaption}>{t('varieties.readyLater')}</Text>
-            </View>
-          </Pressable>
-        ))}
       </Card>
     </Screen>
   );
@@ -149,9 +148,6 @@ const styles = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderColor: colors.border,
   },
-  traitRowDisabled: {
-    opacity: 0.55,
-  },
   checkbox: {
     fontSize: 18,
     color: colors.accentStrong,
@@ -164,9 +160,5 @@ const styles = StyleSheet.create({
   traitText: {
     fontSize: 16,
     color: colors.text,
-  },
-  traitCaption: {
-    fontSize: 13,
-    color: colors.textMuted,
   },
 });

@@ -1,10 +1,13 @@
 import {
+  MeasurementCardDraft,
+  MeasurementSubplotDraft,
   SyncTaskStatus,
   TraitCode,
   TraitDraft,
   TraitPlotDraft,
   TraitState,
 } from '../types/app';
+import { getTraitDefinition } from '../constants/traits';
 
 export function getOrCreatePlotDraft(
   draft: TraitDraft | undefined,
@@ -27,9 +30,64 @@ export function isInfectionCardComplete(card: {
   return Boolean(card.photoUri && card.plantNumber.trim() && card.rowNumber.trim());
 }
 
+export function createMeasurementSubplotDraft(
+  key: 'A' | 'B',
+): MeasurementSubplotDraft {
+  return {
+    key,
+    photoConfirmed: false,
+    plantCount: '',
+    measurements: [],
+  };
+}
+
+export function getOrCreateMeasurementDraft(
+  draft: TraitDraft | undefined,
+) {
+  return (
+    draft?.measurement || {
+      subplotA: createMeasurementSubplotDraft('A'),
+      subplotB: createMeasurementSubplotDraft('B'),
+      currentStep: 1 as const,
+    }
+  );
+}
+
+export function getMeasurementSubplot(
+  draft: TraitDraft | undefined,
+  key: 'A' | 'B',
+) {
+  const measurementDraft = getOrCreateMeasurementDraft(draft);
+  return key === 'A' ? measurementDraft.subplotA : measurementDraft.subplotB;
+}
+
+export function createMeasurementCardDraft(id: string): MeasurementCardDraft {
+  return {
+    id,
+    value: '',
+    isComplete: false,
+    isCollapsed: false,
+  };
+}
+
+export function isMeasurementCardComplete(card: {
+  photoUri?: string;
+  value: string;
+}) {
+  return Boolean(card.photoUri && card.value.trim());
+}
+
+export function isMeasurementTraitCompleted(draft: TraitDraft | undefined) {
+  return Boolean(draft?.measurement?.completedAt);
+}
+
 export function computeTraitState(draft: TraitDraft | undefined): TraitState {
   if (!draft) {
     return 'not_started';
+  }
+
+  if (draft.measurement) {
+    return isMeasurementTraitCompleted(draft) ? 'completed' : 'in_progress';
   }
 
   const plots = Object.values(draft.plots);
@@ -62,6 +120,10 @@ export function getCompletedPlotsCount(draft: TraitDraft | undefined) {
     return 0;
   }
 
+  if (draft.measurement) {
+    return isMeasurementTraitCompleted(draft) ? 1 : 0;
+  }
+
   return Object.values(draft.plots).filter((plot) => plot.confirmedAt).length;
 }
 
@@ -70,14 +132,32 @@ export function getSyncedPlotsCount(draft: TraitDraft | undefined) {
     return 0;
   }
 
+  if (draft.measurement) {
+    return isMeasurementTraitCompleted(draft) ? 1 : 0;
+  }
+
   return Object.values(draft.plots).filter((plot) => plot.syncStatus === 'synced').length;
 }
 
-export function isTraitRouteCompleted(draft: TraitDraft | undefined) {
+export function isTraitRouteCompleted(
+  draft: TraitDraft | undefined,
+  traitCode?: TraitCode,
+) {
+  if (traitCode && getTraitDefinition(traitCode).flowKind === 'measurement_ab_flow') {
+    return isMeasurementTraitCompleted(draft);
+  }
+
   return getCompletedPlotsCount(draft) >= 3;
 }
 
-export function isTraitFullySynced(draft: TraitDraft | undefined) {
+export function isTraitFullySynced(
+  draft: TraitDraft | undefined,
+  traitCode?: TraitCode,
+) {
+  if (traitCode && getTraitDefinition(traitCode).flowKind === 'measurement_ab_flow') {
+    return isMeasurementTraitCompleted(draft);
+  }
+
   return getSyncedPlotsCount(draft) >= 3;
 }
 

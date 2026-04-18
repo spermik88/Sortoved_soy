@@ -150,6 +150,47 @@ export const ru = {
     noOverviewCantContinue:
       'Сначала сделайте и подтвердите фото делянки, затем можно перейти дальше.',
   },
+  measurementFlow: {
+    step1Title: 'Шаг 1. Участок А',
+    step2Title: 'Шаг 2. Измерения участка А',
+    step3Title: 'Шаг 3. Участок Б',
+    step4Title: 'Шаг 4. Измерения участка Б',
+    subplotLabel: 'Участок',
+    subplotAInstruction:
+      'Случайно выберите среди трех делянок сорта участок А площадью 0,5 м². На этом участке вы будете проводить анализ. Сделайте фото выбранного участка А.',
+    subplotBInstruction:
+      'Случайно выберите среди трех делянок сорта участок Б площадью 0,5 м². На этом участке вы будете проводить анализ. Сделайте фото выбранного участка Б.',
+    subplotPhotoMissing: 'После съемки здесь появится фото выбранного участка.',
+    confirmPlotPhoto: 'Подтвердить фото',
+    retakePlotPhoto: 'Сделать снимок заново',
+    photoLocked: 'Фото подтверждено и больше не редактируется.',
+    plantCountLabel: 'Количество растений, попавших в участок',
+    plantCountPlaceholder: 'Например, 12',
+    plantCountInvalid: 'Введите целое число больше 0.',
+    examplesTitle: 'Примеры фото',
+    carouselFolderPrefix: 'Папка карусели:',
+    examplePlaceholder: 'Плейсхолдер',
+    expectedMeasurementsPrefix: 'Ожидается измерений:',
+    measurementTitle: 'Измерение',
+    measurementPhotoMissing: 'Сделайте фото измерения.',
+    retakeMeasurementPhoto: 'Сделать фото заново',
+    valueLabel: 'Введите данные',
+    valuePlaceholder: 'Например, 15',
+    saveMeasurement: 'Готово',
+    addMeasurement: 'Добавить измерение',
+    finishCurrentCardHint:
+      'Сначала завершите текущую карточку измерения, затем можно добавить следующую.',
+    measurementLimitHint:
+      'Количество карточек измерения не может превышать количество растений в участке.',
+    draftState: 'Черновик',
+    expandCard: 'Развернуть',
+    collapseCard: 'Свернуть',
+    cardLocked: 'Карточка сохранена и доступна только для просмотра.',
+    finishTrait: 'Завершить',
+    completionTitle: 'Признак сохранен',
+    completionDescription:
+      'Участки А и Б заполнены. Данные по этому признаку сохранены локально на устройстве.',
+  },
   traitFlowVariants: {
     default: {
       step2Title: 'Шаг 2. Отметьте зараженные растения',

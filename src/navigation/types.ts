@@ -14,4 +14,10 @@ export type RootStackParamList = {
   TraitInfections: { traitCode: TraitCode; varietyId: string; plotIndex: number };
   TraitReview: { traitCode: TraitCode; varietyId: string; plotIndex: number };
   TraitCompletion: { traitCode: TraitCode; varietyId: string };
+  MeasurementTraitFlow: {
+    traitCode: TraitCode;
+    varietyId: string;
+    step: 1 | 2 | 3 | 4;
+  };
+  MeasurementTraitCompletion: { traitCode: TraitCode; varietyId: string };
 };

@@ -17,6 +17,8 @@ import { qrResolver } from '../services/qrResolver';
 import {
   AccountRole,
   InfectionCard,
+  MeasurementCardDraft,
+  MeasurementSubplotDraft,
   PersistedAppState,
   SyncTask,
   SyncTaskStatus,
@@ -29,13 +31,17 @@ import {
 import { createId } from '../utils/id';
 import {
   computeTraitState,
+  createMeasurementCardDraft,
   getCompletedPlotsCount as countCompletedPlots,
   getLatestPlotStatus,
+  getMeasurementSubplot,
+  getOrCreateMeasurementDraft,
   getOrCreatePlotDraft,
   getSyncedPlotsCount as countSyncedPlots,
+  isInfectionCardComplete,
+  isMeasurementCardComplete,
   isTraitFullySynced,
   isTraitRouteCompleted,
-  isInfectionCardComplete,
 } from './appStateUtils';
 
 const initialState: PersistedAppState = {
@@ -138,6 +144,38 @@ function updateVarietyTraitStatus(
   };
 }
 
+function updateMeasurementSubplot(
+  subplot: MeasurementSubplotDraft,
+  changes: Partial<MeasurementSubplotDraft>,
+): MeasurementSubplotDraft {
+  return {
+    ...subplot,
+    ...changes,
+  };
+}
+
+function updateMeasurementCardList(
+  cards: MeasurementCardDraft[],
+  cardId: string,
+  changes: Partial<MeasurementCardDraft>,
+) {
+  return cards.map((card) => {
+    if (card.id !== cardId) {
+      return card;
+    }
+
+    const nextCard = {
+      ...card,
+      ...changes,
+    };
+
+    return {
+      ...nextCard,
+      isComplete: isMeasurementCardComplete(nextCard),
+    };
+  });
+}
+
 interface AppContextValue {
   hydrated: boolean;
   state: PersistedAppState;
@@ -164,6 +202,54 @@ interface AppContextValue {
   ) => void;
   confirmTraitPlot: (traitCode: TraitCode, varietyId: string, plotIndex: number) => void;
   getTraitPlotDraft: (traitCode: TraitCode, varietyId: string, plotIndex: number) => TraitPlotDraft;
+  saveMeasurementSubplotPhoto: (
+    traitCode: TraitCode,
+    varietyId: string,
+    subplot: 'A' | 'B',
+    uri: string,
+  ) => void;
+  confirmMeasurementSubplotPhoto: (
+    traitCode: TraitCode,
+    varietyId: string,
+    subplot: 'A' | 'B',
+  ) => void;
+  setMeasurementSubplotPlantCount: (
+    traitCode: TraitCode,
+    varietyId: string,
+    subplot: 'A' | 'B',
+    plantCount: string,
+  ) => void;
+  addMeasurementCard: (
+    traitCode: TraitCode,
+    varietyId: string,
+    subplot: 'A' | 'B',
+  ) => void;
+  updateMeasurementCard: (
+    traitCode: TraitCode,
+    varietyId: string,
+    subplot: 'A' | 'B',
+    cardId: string,
+    changes: Partial<MeasurementCardDraft>,
+  ) => void;
+  completeMeasurementCard: (
+    traitCode: TraitCode,
+    varietyId: string,
+    subplot: 'A' | 'B',
+    cardId: string,
+  ) => void;
+  toggleMeasurementCardCollapsed: (
+    traitCode: TraitCode,
+    varietyId: string,
+    subplot: 'A' | 'B',
+    cardId: string,
+  ) => void;
+  setMeasurementCurrentStep: (
+    traitCode: TraitCode,
+    varietyId: string,
+    step: 1 | 2 | 3 | 4,
+  ) => void;
+  completeMeasurementTrait: (traitCode: TraitCode, varietyId: string) => void;
+  getMeasurementTraitDraft: (traitCode: TraitCode, varietyId: string) => TraitDraft['measurement'];
   getNextTraitPlot: (traitCode: TraitCode, varietyId: string) => number;
   getCompletedPlotsCount: (traitCode: TraitCode, varietyId: string) => number;
   getSyncedPlotsCount: (traitCode: TraitCode, varietyId: string) => number;
@@ -229,6 +315,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
             varietyId: taskSnapshot.varietyId,
             traitCode: taskSnapshot.traitCode,
             lastUpdated: now,
+            measurement: draft?.measurement,
             plots: {
               ...draft?.plots,
               [String(taskSnapshot.plotIndex)]: {
@@ -267,6 +354,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
           varietyId: taskSnapshot.varietyId,
           traitCode: taskSnapshot.traitCode,
           lastUpdated: now,
+          measurement: draft?.measurement,
           plots: {
             ...draft?.plots,
             [String(taskSnapshot.plotIndex)]: {
@@ -310,6 +398,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
           varietyId: completedTask.varietyId,
           traitCode: completedTask.traitCode,
           lastUpdated: new Date().toISOString(),
+          measurement: draft?.measurement,
           plots: {
             ...draft?.plots,
             [String(completedTask.plotIndex)]: {
@@ -470,6 +559,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
             varietyId,
             traitCode,
             lastUpdated: new Date().toISOString(),
+            measurement: draft?.measurement,
             plots: {
               ...draft?.plots,
               [String(plotIndex)]: {
@@ -495,6 +585,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
             varietyId,
             traitCode,
             lastUpdated: new Date().toISOString(),
+            measurement: draft?.measurement,
             plots: {
               ...draft?.plots,
               [String(plotIndex)]: {
@@ -516,6 +607,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
               varietyId,
               traitCode,
               lastUpdated: new Date().toISOString(),
+              measurement: draft?.measurement,
               plots: {
                 ...draft?.plots,
                 [String(plotIndex)]: {
@@ -552,6 +644,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
               varietyId,
               traitCode,
               lastUpdated: new Date().toISOString(),
+              measurement: draft?.measurement,
               plots: {
                 ...draft?.plots,
                 [String(plotIndex)]: {
@@ -575,10 +668,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
             task.plotIndex === plotIndex,
         );
 
-        if (
-          plotDraft.confirmedAt &&
-          existingTask
-        ) {
+        if (plotDraft.confirmedAt && existingTask) {
           return;
         }
 
@@ -610,6 +700,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
             varietyId,
             traitCode,
             lastUpdated: now,
+            measurement: currentDraft?.measurement,
             plots: {
               ...currentDraft?.plots,
               [String(plotIndex)]: {
@@ -631,8 +722,261 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
         void processTask(taskId);
       },
+      saveMeasurementSubplotPhoto(traitCode, varietyId, subplot, uri) {
+        setState((current) => {
+          const nextState = withUpdatedTraitDraft(current, varietyId, traitCode, (draft) => {
+            const measurementDraft = getOrCreateMeasurementDraft(draft);
+            const currentSubplot = getMeasurementSubplot(draft, subplot);
+            const nextSubplot = updateMeasurementSubplot(currentSubplot, {
+              photoUri: uri,
+              photoConfirmed: false,
+            });
+
+            return {
+              varietyId,
+              traitCode,
+              lastUpdated: new Date().toISOString(),
+              measurement: {
+                ...measurementDraft,
+                subplotA: subplot === 'A' ? nextSubplot : measurementDraft.subplotA,
+                subplotB: subplot === 'B' ? nextSubplot : measurementDraft.subplotB,
+              },
+              plots: draft?.plots || {},
+            };
+          });
+
+          return updateVarietyTraitStatus(nextState, varietyId, traitCode);
+        });
+      },
+      confirmMeasurementSubplotPhoto(traitCode, varietyId, subplot) {
+        setState((current) => {
+          const nextState = withUpdatedTraitDraft(current, varietyId, traitCode, (draft) => {
+            const measurementDraft = getOrCreateMeasurementDraft(draft);
+            const currentSubplot = getMeasurementSubplot(draft, subplot);
+            const nextSubplot = updateMeasurementSubplot(currentSubplot, {
+              photoConfirmed: Boolean(currentSubplot.photoUri),
+            });
+
+            return {
+              varietyId,
+              traitCode,
+              lastUpdated: new Date().toISOString(),
+              measurement: {
+                ...measurementDraft,
+                subplotA: subplot === 'A' ? nextSubplot : measurementDraft.subplotA,
+                subplotB: subplot === 'B' ? nextSubplot : measurementDraft.subplotB,
+              },
+              plots: draft?.plots || {},
+            };
+          });
+
+          return updateVarietyTraitStatus(nextState, varietyId, traitCode);
+        });
+      },
+      setMeasurementSubplotPlantCount(traitCode, varietyId, subplot, plantCount) {
+        setState((current) => {
+          const nextState = withUpdatedTraitDraft(current, varietyId, traitCode, (draft) => {
+            const measurementDraft = getOrCreateMeasurementDraft(draft);
+            const currentSubplot = getMeasurementSubplot(draft, subplot);
+            const nextSubplot = updateMeasurementSubplot(currentSubplot, {
+              plantCount,
+            });
+
+            return {
+              varietyId,
+              traitCode,
+              lastUpdated: new Date().toISOString(),
+              measurement: {
+                ...measurementDraft,
+                subplotA: subplot === 'A' ? nextSubplot : measurementDraft.subplotA,
+                subplotB: subplot === 'B' ? nextSubplot : measurementDraft.subplotB,
+              },
+              plots: draft?.plots || {},
+            };
+          });
+
+          return updateVarietyTraitStatus(nextState, varietyId, traitCode);
+        });
+      },
+      addMeasurementCard(traitCode, varietyId, subplot) {
+        setState((current) => {
+          const nextState = withUpdatedTraitDraft(current, varietyId, traitCode, (draft) => {
+            const measurementDraft = getOrCreateMeasurementDraft(draft);
+            const currentSubplot = getMeasurementSubplot(draft, subplot);
+            const plantCount = Number.parseInt(currentSubplot.plantCount, 10);
+            const hasIncompleteCard = currentSubplot.measurements.some((card) => !card.isComplete);
+
+            if (
+              hasIncompleteCard ||
+              !Number.isInteger(plantCount) ||
+              plantCount <= 0 ||
+              currentSubplot.measurements.length >= plantCount
+            ) {
+              return {
+                varietyId,
+                traitCode,
+                lastUpdated: draft?.lastUpdated || new Date().toISOString(),
+                measurement: measurementDraft,
+                plots: draft?.plots || {},
+              };
+            }
+
+            const nextSubplot = updateMeasurementSubplot(currentSubplot, {
+              measurements: [
+                ...currentSubplot.measurements,
+                createMeasurementCardDraft(createId('measurement')),
+              ],
+            });
+
+            return {
+              varietyId,
+              traitCode,
+              lastUpdated: new Date().toISOString(),
+              measurement: {
+                ...measurementDraft,
+                subplotA: subplot === 'A' ? nextSubplot : measurementDraft.subplotA,
+                subplotB: subplot === 'B' ? nextSubplot : measurementDraft.subplotB,
+              },
+              plots: draft?.plots || {},
+            };
+          });
+
+          return updateVarietyTraitStatus(nextState, varietyId, traitCode);
+        });
+      },
+      updateMeasurementCard(traitCode, varietyId, subplot, cardId, changes) {
+        setState((current) => {
+          const nextState = withUpdatedTraitDraft(current, varietyId, traitCode, (draft) => {
+            const measurementDraft = getOrCreateMeasurementDraft(draft);
+            const currentSubplot = getMeasurementSubplot(draft, subplot);
+            const nextSubplot = updateMeasurementSubplot(currentSubplot, {
+              measurements: updateMeasurementCardList(currentSubplot.measurements, cardId, changes),
+            });
+
+            return {
+              varietyId,
+              traitCode,
+              lastUpdated: new Date().toISOString(),
+              measurement: {
+                ...measurementDraft,
+                subplotA: subplot === 'A' ? nextSubplot : measurementDraft.subplotA,
+                subplotB: subplot === 'B' ? nextSubplot : measurementDraft.subplotB,
+              },
+              plots: draft?.plots || {},
+            };
+          });
+
+          return updateVarietyTraitStatus(nextState, varietyId, traitCode);
+        });
+      },
+      completeMeasurementCard(traitCode, varietyId, subplot, cardId) {
+        setState((current) => {
+          const nextState = withUpdatedTraitDraft(current, varietyId, traitCode, (draft) => {
+            const measurementDraft = getOrCreateMeasurementDraft(draft);
+            const currentSubplot = getMeasurementSubplot(draft, subplot);
+            const card = currentSubplot.measurements.find((item) => item.id === cardId);
+
+            if (!card || !isMeasurementCardComplete(card)) {
+              return {
+                varietyId,
+                traitCode,
+                lastUpdated: draft?.lastUpdated || new Date().toISOString(),
+                measurement: measurementDraft,
+                plots: draft?.plots || {},
+              };
+            }
+
+            const nextSubplot = updateMeasurementSubplot(currentSubplot, {
+              measurements: currentSubplot.measurements.map((item) =>
+                item.id === cardId
+                  ? { ...item, isComplete: true, isCollapsed: true }
+                  : item,
+              ),
+            });
+
+            return {
+              varietyId,
+              traitCode,
+              lastUpdated: new Date().toISOString(),
+              measurement: {
+                ...measurementDraft,
+                subplotA: subplot === 'A' ? nextSubplot : measurementDraft.subplotA,
+                subplotB: subplot === 'B' ? nextSubplot : measurementDraft.subplotB,
+              },
+              plots: draft?.plots || {},
+            };
+          });
+
+          return updateVarietyTraitStatus(nextState, varietyId, traitCode);
+        });
+      },
+      toggleMeasurementCardCollapsed(traitCode, varietyId, subplot, cardId) {
+        setState((current) => {
+          const nextState = withUpdatedTraitDraft(current, varietyId, traitCode, (draft) => {
+            const measurementDraft = getOrCreateMeasurementDraft(draft);
+            const currentSubplot = getMeasurementSubplot(draft, subplot);
+            const nextSubplot = updateMeasurementSubplot(currentSubplot, {
+              measurements: currentSubplot.measurements.map((item) =>
+                item.id === cardId && item.isComplete
+                  ? { ...item, isCollapsed: !item.isCollapsed }
+                  : item,
+              ),
+            });
+
+            return {
+              varietyId,
+              traitCode,
+              lastUpdated: new Date().toISOString(),
+              measurement: {
+                ...measurementDraft,
+                subplotA: subplot === 'A' ? nextSubplot : measurementDraft.subplotA,
+                subplotB: subplot === 'B' ? nextSubplot : measurementDraft.subplotB,
+              },
+              plots: draft?.plots || {},
+            };
+          });
+
+          return updateVarietyTraitStatus(nextState, varietyId, traitCode);
+        });
+      },
+      setMeasurementCurrentStep(traitCode, varietyId, step) {
+        setState((current) => {
+          const nextState = withUpdatedTraitDraft(current, varietyId, traitCode, (draft) => ({
+            varietyId,
+            traitCode,
+            lastUpdated: new Date().toISOString(),
+            measurement: {
+              ...getOrCreateMeasurementDraft(draft),
+              currentStep: step,
+            },
+            plots: draft?.plots || {},
+          }));
+
+          return updateVarietyTraitStatus(nextState, varietyId, traitCode);
+        });
+      },
+      completeMeasurementTrait(traitCode, varietyId) {
+        setState((current) => {
+          const nextState = withUpdatedTraitDraft(current, varietyId, traitCode, (draft) => ({
+            varietyId,
+            traitCode,
+            lastUpdated: new Date().toISOString(),
+            measurement: {
+              ...getOrCreateMeasurementDraft(draft),
+              currentStep: 4,
+              completedAt: new Date().toISOString(),
+            },
+            plots: draft?.plots || {},
+          }));
+
+          return updateVarietyTraitStatus(nextState, varietyId, traitCode);
+        });
+      },
       getTraitPlotDraft(traitCode, varietyId, plotIndex) {
         return getOrCreatePlotDraft(getTraitDraft(state, varietyId, traitCode), plotIndex);
+      },
+      getMeasurementTraitDraft(traitCode, varietyId) {
+        return getOrCreateMeasurementDraft(getTraitDraft(state, varietyId, traitCode));
       },
       getNextTraitPlot(traitCode, varietyId) {
         const plots = getTraitDraft(state, varietyId, traitCode)?.plots || {};
@@ -675,11 +1019,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
       getTraitCheckboxState(traitCode, varietyId) {
         const draft = getTraitDraft(state, varietyId, traitCode);
 
-        if (isTraitFullySynced(draft)) {
+        if (isTraitFullySynced(draft, traitCode)) {
           return 'fully_synced';
         }
 
-        if (isTraitRouteCompleted(draft)) {
+        if (isTraitRouteCompleted(draft, traitCode)) {
           return 'completed_pending_sync';
         }
 

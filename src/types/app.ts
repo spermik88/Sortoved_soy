@@ -16,7 +16,16 @@ export type TraitCode =
   | 'full_maturity'
   | 'stem_pubescence_color'
   | 'lodging_resistance'
-  | 'shattering_resistance';
+  | 'shattering_resistance'
+  | 'stem_length'
+  | 'lower_pod_attachment_height'
+  | 'productive_nodes_count'
+  | 'branch_count'
+  | 'productive_pods_count'
+  | 'pods_per_productive_node'
+  | 'seeds_per_plant'
+  | 'seeds_per_pod'
+  | 'seed_weight_per_plant';
 export type TraitState = 'not_started' | 'in_progress' | 'completed';
 export type SyncTaskStatus =
   | 'queued'
@@ -50,10 +59,34 @@ export interface TraitPlotDraft {
   lastQueuedAt?: string;
 }
 
+export interface MeasurementCardDraft {
+  id: string;
+  photoUri?: string;
+  value: string;
+  isComplete: boolean;
+  isCollapsed: boolean;
+}
+
+export interface MeasurementSubplotDraft {
+  key: 'A' | 'B';
+  photoUri?: string;
+  photoConfirmed: boolean;
+  plantCount: string;
+  measurements: MeasurementCardDraft[];
+}
+
+export interface MeasurementTraitDraft {
+  subplotA: MeasurementSubplotDraft;
+  subplotB: MeasurementSubplotDraft;
+  currentStep: 1 | 2 | 3 | 4;
+  completedAt?: string;
+}
+
 export interface TraitDraft {
   varietyId: string;
   traitCode: TraitCode;
   plots: Record<string, TraitPlotDraft>;
+  measurement?: MeasurementTraitDraft;
   lastUpdated: string;
 }
 

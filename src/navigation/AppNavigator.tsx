@@ -6,6 +6,10 @@ import { LoadingBlock } from '../components/Ui';
 import { useApp } from '../context/AppContext';
 import { t } from '../i18n';
 import {
+  MeasurementTraitCompletionScreen,
+  MeasurementTraitFlowScreen,
+} from '../screens/MeasurementTraitScreens';
+import {
   TraitCompletionScreen,
   TraitInfectionsScreen,
   TraitOverviewScreen,
@@ -73,6 +77,11 @@ export function AppNavigator() {
         <Stack.Screen name="TraitInfections" component={TraitInfectionsScreen} />
         <Stack.Screen name="TraitReview" component={TraitReviewScreen} />
         <Stack.Screen name="TraitCompletion" component={TraitCompletionScreen} />
+        <Stack.Screen name="MeasurementTraitFlow" component={MeasurementTraitFlowScreen} />
+        <Stack.Screen
+          name="MeasurementTraitCompletion"
+          component={MeasurementTraitCompletionScreen}
+        />
       </Stack.Navigator>
     </NavigationContainer>
   );

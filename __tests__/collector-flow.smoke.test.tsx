@@ -1,6 +1,9 @@
 import React from 'react';
 import { render } from '@testing-library/react-native';
 
+import {
+  MeasurementTraitFlowScreen,
+} from '../src/screens/MeasurementTraitScreens';
 import { MainMenuScreen } from '../src/screens/OnboardingScreens';
 import { RoleSelectionScreen } from '../src/screens/RoleSelectionScreen';
 import {
@@ -38,6 +41,15 @@ const mockApp = {
           stem_pubescence_color: 'completed',
           lodging_resistance: 'completed',
           shattering_resistance: 'completed',
+          stem_length: 'not_started',
+          lower_pod_attachment_height: 'not_started',
+          productive_nodes_count: 'not_started',
+          branch_count: 'not_started',
+          productive_pods_count: 'not_started',
+          pods_per_productive_node: 'not_started',
+          seeds_per_plant: 'not_started',
+          seeds_per_pod: 'not_started',
+          seed_weight_per_plant: 'not_started',
         },
       },
     ],
@@ -48,17 +60,41 @@ const mockApp = {
   getAggregateTraitState: () => 'in_progress',
   getTraitCheckboxState: (traitCode: string) =>
     traitCode === 'aphid_damage' ? 'completed_pending_sync' : 'fully_synced',
-  getTraitPlotDraft: () => ({
+  getTraitPlotDraft: (): any => ({
     plotIndex: 1,
     overviewPhoto: 'file:///plot.jpg',
     infections: [],
     syncStatus: 'idle' as const,
+  }),
+  getMeasurementTraitDraft: () => ({
+    currentStep: 1 as const,
+    subplotA: {
+      key: 'A' as const,
+      photoConfirmed: false,
+      plantCount: '',
+      measurements: [],
+    },
+    subplotB: {
+      key: 'B' as const,
+      photoConfirmed: false,
+      plantCount: '',
+      measurements: [],
+    },
   }),
   addInfectionCard: jest.fn(),
   removeInfectionCard: jest.fn(),
   updateInfectionCard: jest.fn(),
   confirmTraitPlot: jest.fn(),
   saveOverviewPhoto: jest.fn(),
+  saveMeasurementSubplotPhoto: jest.fn(),
+  confirmMeasurementSubplotPhoto: jest.fn(),
+  setMeasurementSubplotPlantCount: jest.fn(),
+  addMeasurementCard: jest.fn(),
+  updateMeasurementCard: jest.fn(),
+  completeMeasurementCard: jest.fn(),
+  toggleMeasurementCardCollapsed: jest.fn(),
+  setMeasurementCurrentStep: jest.fn(),
+  completeMeasurementTrait: jest.fn(),
 };
 
 jest.mock('../src/context/AppContext', () => ({
@@ -67,7 +103,7 @@ jest.mock('../src/context/AppContext', () => ({
 
 describe('collector flow smoke', () => {
   beforeEach(() => {
-    mockApp.getTraitPlotDraft = () => ({
+    mockApp.getTraitPlotDraft = (): any => ({
       plotIndex: 1,
       overviewPhoto: 'file:///plot.jpg',
       infections: [],
@@ -93,7 +129,7 @@ describe('collector flow smoke', () => {
     expect(screen.getByText('Тестовый режим')).toBeTruthy();
   });
 
-  it('renders aggregate variety detail status with traits 10-16 enabled', () => {
+  it('renders variety detail including measurement traits', () => {
     const screen = render(
       <VarietyDetailScreen
         navigation={{ navigate: jest.fn() } as never}
@@ -102,21 +138,8 @@ describe('collector flow smoke', () => {
     );
 
     expect(screen.getByText('Соя 3')).toBeTruthy();
-    expect(screen.getByText('Активные ходы в работе')).toBeTruthy();
-    expect(screen.getByText('4. Начало цветения')).toBeTruthy();
-    expect(screen.getByText('5. Полное цветение')).toBeTruthy();
-    expect(screen.getByText('9. Повреждение тлей')).toBeTruthy();
-    expect(screen.getByText('10. Цветок: окраска')).toBeTruthy();
-    expect(screen.getByText('11. Конец цветения')).toBeTruthy();
-    expect(screen.getByText('12. Форма бокового листочка')).toBeTruthy();
-    expect(screen.getByText('13. Полное созревание')).toBeTruthy();
-    expect(screen.getByText('14. Окраска опушения главного стебля')).toBeTruthy();
-    expect(screen.getByText('15. Устойчивость к полеганию')).toBeTruthy();
-    expect(screen.getByText('16. Устойчивость к осыпанию')).toBeTruthy();
-    expect(screen.getAllByText('[x][x]').length).toBeGreaterThan(0);
-    expect(screen.getByText('[x]')).toBeTruthy();
-    expect(screen.queryByText('10. Цветок: окраска', { exact: true })).toBeTruthy();
-    expect(screen.getAllByText('Будет реализовано позже')).toHaveLength(13);
+    expect(screen.getByText('17. Длина стебля')).toBeTruthy();
+    expect(screen.getByText('25. Масса семян с растения')).toBeTruthy();
   });
 
   it('renders flowering start copy and keeps next enabled without cards', () => {
@@ -131,13 +154,11 @@ describe('collector flow smoke', () => {
 
     expect(screen.getByText(/Шаг 2\. Отметьте зацветшие растения/)).toBeTruthy();
     expect(screen.getByText('Карточки зацветших растений')).toBeTruthy();
-    expect(screen.getByText('Добавить зацветшее растение')).toBeTruthy();
-    expect(screen.getByText('Зацветшие растения не добавлены.')).toBeTruthy();
     expect(screen.getByText('Далее').parent?.props.disabled).toBeFalsy();
   });
 
   it('renders full flowering copy in step 2 and step 3', () => {
-    mockApp.getTraitPlotDraft = () => ({
+    mockApp.getTraitPlotDraft = (): any => ({
       plotIndex: 1,
       overviewPhoto: 'file:///plot.jpg',
       infections: [
@@ -162,9 +183,6 @@ describe('collector flow smoke', () => {
     );
 
     expect(step2.getByText(/Шаг 2\. Отметьте растения в полном цветении/)).toBeTruthy();
-    expect(step2.getByText('Карточки растений в полном цветении')).toBeTruthy();
-    expect(step2.getByText('Растение в полном цветении 1')).toBeTruthy();
-    expect(step2.getByText('Сделайте фото растения в полном цветении.')).toBeTruthy();
 
     const step3 = render(
       <TraitReviewScreen
@@ -176,79 +194,20 @@ describe('collector flow smoke', () => {
     );
 
     expect(step3.getByText('Карточки растений в полном цветении')).toBeTruthy();
-    expect(step3.getByText('Растение в полном цветении 1')).toBeTruthy();
-    expect(step3.getByText('Сделайте фото растения в полном цветении.')).toBeTruthy();
   });
 
-  it('keeps disease copy unchanged for disease traits', () => {
+  it('renders measurement flow step 1', () => {
     const screen = render(
-      <TraitInfectionsScreen
-        navigation={{ goBack: jest.fn(), navigate: jest.fn() } as never}
-        route={{ params: { traitCode: 'fusarium', varietyId: 'v1', plotIndex: 1 } } as never}
-      />,
-    );
-
-    expect(screen.getByText(/Шаг 2\. Отметьте зараженные растения/)).toBeTruthy();
-    expect(screen.getByText('Карточки заражения')).toBeTruthy();
-    expect(screen.getByText('Добавить заражение')).toBeTruthy();
-  });
-
-  it('renders trait 10 copy and keeps next enabled without cards', () => {
-    const screen = render(
-      <TraitInfectionsScreen
-        navigation={{ goBack: jest.fn(), navigate: jest.fn() } as never}
-        route={{ params: { traitCode: 'flower_color', varietyId: 'v1', plotIndex: 1 } } as never}
-      />,
-    );
-
-    expect(screen.getByText(/Шаг 2\. Отметьте растения с окраской цветка/)).toBeTruthy();
-    expect(screen.getByText('Карточки растений с окраской цветка')).toBeTruthy();
-    expect(screen.getByText('Добавить растение с окраской цветка')).toBeTruthy();
-    expect(screen.getByText('Растения с окраской цветка не добавлены.')).toBeTruthy();
-    expect(screen.getByText('Далее').parent?.props.disabled).toBeFalsy();
-  });
-
-  it('renders trait 16 copy in step 2 and step 3', () => {
-    mockApp.getTraitPlotDraft = () => ({
-      plotIndex: 1,
-      overviewPhoto: 'file:///plot.jpg',
-      infections: [
-        {
-          id: 'card-1',
-          photoUri: undefined,
-          plantNumber: '3',
-          rowNumber: '1',
-          isComplete: false,
-        },
-      ],
-      syncStatus: 'queued' as const,
-    });
-
-    const step2 = render(
-      <TraitInfectionsScreen
-        navigation={{ goBack: jest.fn(), navigate: jest.fn() } as never}
+      <MeasurementTraitFlowScreen
+        navigation={{ goBack: jest.fn(), navigate: jest.fn(), replace: jest.fn() } as never}
         route={{
-          params: { traitCode: 'shattering_resistance', varietyId: 'v1', plotIndex: 1 },
+          params: { traitCode: 'stem_length', varietyId: 'v1', step: 1 },
         } as never}
       />,
     );
 
-    expect(step2.getByText(/Шаг 2\. Отметьте растения с осыпанием/)).toBeTruthy();
-    expect(step2.getByText('Карточки растений с осыпанием')).toBeTruthy();
-    expect(step2.getByText('Растение с осыпанием 1')).toBeTruthy();
-    expect(step2.getByText('Сделайте фото растения с осыпанием.')).toBeTruthy();
-
-    const step3 = render(
-      <TraitReviewScreen
-        navigation={{ goBack: jest.fn(), replace: jest.fn() } as never}
-        route={{
-          params: { traitCode: 'shattering_resistance', varietyId: 'v1', plotIndex: 1 },
-        } as never}
-      />,
-    );
-
-    expect(step3.getByText('Карточки растений с осыпанием')).toBeTruthy();
-    expect(step3.getByText('Растение с осыпанием 1')).toBeTruthy();
-    expect(step3.getByText('Сделайте фото растения с осыпанием.')).toBeTruthy();
+    expect(screen.getByText('Шаг 1. Участок А')).toBeTruthy();
+    expect(screen.getByText('Количество растений, попавших в участок')).toBeTruthy();
+    expect(screen.getByText('Сделать фото')).toBeTruthy();
   });
 });

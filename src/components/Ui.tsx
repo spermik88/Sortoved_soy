@@ -85,12 +85,14 @@ export function Field({
   onChangeText,
   keyboardType = 'default',
   placeholder,
+  editable = true,
 }: {
   label: string;
   value: string;
   onChangeText: (value: string) => void;
   keyboardType?: 'default' | 'numeric';
   placeholder?: string;
+  editable?: boolean;
 }) {
   return (
     <View style={styles.fieldWrap}>
@@ -100,6 +102,7 @@ export function Field({
         onChangeText={onChangeText}
         placeholder={placeholder}
         keyboardType={keyboardType}
+        editable={editable}
         style={styles.input}
         placeholderTextColor={colors.textMuted}
       />
