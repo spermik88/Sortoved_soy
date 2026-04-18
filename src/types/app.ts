@@ -4,6 +4,8 @@ export type TraitCode =
   | 'fusarium'
   | 'septoria'
   | 'flea_damage'
+  | 'flowering_start'
+  | 'flowering_full'
   | 'bacteriosis'
   | 'downy_mildew'
   | 'cercospora'

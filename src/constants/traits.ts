@@ -8,12 +8,15 @@ export interface TraitDefinition {
   sampleTitle: string;
   inspectionDescription: string;
   isEnabled: boolean;
+  flowCopyKey?: 'default' | 'flowering_start' | 'flowering_full';
 }
 
 export const ENABLED_TRAIT_CODES: TraitCode[] = [
   'fusarium',
   'septoria',
   'flea_damage',
+  'flowering_start',
+  'flowering_full',
   'bacteriosis',
   'downy_mildew',
   'cercospora',
@@ -50,6 +53,28 @@ export const TRAITS: TraitDefinition[] = [
     inspectionDescription:
       'Тщательно осмотрите каждое растение на делянке на повреждение блошкой. Сделайте фотографию каждого найденного поврежденного растения и укажите его положение.',
     isEnabled: true,
+  },
+  {
+    code: 'flowering_start',
+    order: 4,
+    title: '4. Начало цветения',
+    shortTitle: 'Начало цветения',
+    sampleTitle: 'Примеры начала цветения',
+    inspectionDescription:
+      'Тщательно осмотрите каждое растение на делянке на начало цветения. Сделайте фотографию каждого найденного зацветшего растения и укажите его положение.',
+    isEnabled: true,
+    flowCopyKey: 'flowering_start',
+  },
+  {
+    code: 'flowering_full',
+    order: 5,
+    title: '5. Полное цветение',
+    shortTitle: 'Полное цветение',
+    sampleTitle: 'Примеры полного цветения',
+    inspectionDescription:
+      'Тщательно осмотрите каждое растение на делянке в фазе полного цветения. Сделайте фотографию каждого найденного растения в полном цветении и укажите его положение.',
+    isEnabled: true,
+    flowCopyKey: 'flowering_full',
   },
   {
     code: 'bacteriosis',
@@ -94,8 +119,6 @@ export const TRAITS: TraitDefinition[] = [
 ];
 
 export const DISABLED_TRAIT_LABELS = [
-  '4. Начало цветения',
-  '5. Полное цветение',
   '10. Цветок: окраска',
   '11. Конец цветения',
   '12. Форма бокового листочка',
@@ -127,6 +150,8 @@ export function createEmptyTraitStatuses(): Record<TraitCode, 'not_started'> {
     fusarium: 'not_started',
     septoria: 'not_started',
     flea_damage: 'not_started',
+    flowering_start: 'not_started',
+    flowering_full: 'not_started',
     bacteriosis: 'not_started',
     downy_mildew: 'not_started',
     cercospora: 'not_started',

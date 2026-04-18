@@ -33,8 +33,32 @@ function subtitle(traitCode: RootStackParamList['TraitOverview']['traitCode'], p
   return `${trait.title}\n${t('traitFlow.plotLabel')} ${plotIndex} ${t('traitFlow.ofThree')}`;
 }
 
-function infectionLabel(index: number) {
-  return `${t('traitFlow.infectionCardLabel')} ${index + 1}`;
+function getTraitFlowVariantKey(
+  traitCode: RootStackParamList['TraitOverview']['traitCode'],
+): 'default' | 'flowering_start' | 'flowering_full' {
+  return getTraitDefinition(traitCode).flowCopyKey || 'default';
+}
+
+function getTraitFlowText(
+  traitCode: RootStackParamList['TraitOverview']['traitCode'],
+  key:
+    | 'step2Title'
+    | 'cardsTitle'
+    | 'cardLabel'
+    | 'addCard'
+    | 'empty'
+    | 'photoHint'
+    | 'deleteCard'
+    | 'reviewCards',
+) {
+  return t(`traitFlowVariants.${getTraitFlowVariantKey(traitCode)}.${key}`);
+}
+
+function cardLabel(
+  traitCode: RootStackParamList['TraitOverview']['traitCode'],
+  index: number,
+) {
+  return `${getTraitFlowText(traitCode, 'cardLabel')} ${index + 1}`;
 }
 
 export function TraitOverviewScreen({
@@ -191,7 +215,9 @@ export function TraitInfectionsScreen({
 
       <Card>
         <StepIndicator current={2} total={3} />
-        <StatPill label={`${t('traitFlow.currentStep')}: ${t('traitFlow.step2Title')}`} />
+        <StatPill
+          label={`${t('traitFlow.currentStep')}: ${getTraitFlowText(route.params.traitCode, 'step2Title')}`}
+        />
         <Text style={styles.metaText}>
           {t('traitFlow.donePlots')}: {completedPlots}/3
         </Text>
@@ -215,11 +241,13 @@ export function TraitInfectionsScreen({
       ) : null}
 
       <Card>
-        <Text style={styles.sectionTitle}>{t('traitFlow.infectionCards')}</Text>
+        <Text style={styles.sectionTitle}>
+          {getTraitFlowText(route.params.traitCode, 'cardsTitle')}
+        </Text>
         {plotDraft.infections.map((card, index) => (
           <View key={card.id} style={styles.infectionCard}>
             <View style={styles.rowBetween}>
-              <Text style={styles.cardTitle}>{infectionLabel(index)}</Text>
+              <Text style={styles.cardTitle}>{cardLabel(route.params.traitCode, index)}</Text>
               <StatPill
                 label={
                   card.isComplete ? t('traitFlow.infectionReady') : t('traitFlow.infectionDraft')
@@ -227,7 +255,10 @@ export function TraitInfectionsScreen({
                 tone={card.isComplete ? 'success' : 'warning'}
               />
             </View>
-            <PhotoFrame uri={card.photoUri} fallback={t('traitFlow.infectionPhotoHint')} />
+            <PhotoFrame
+              uri={card.photoUri}
+              fallback={getTraitFlowText(route.params.traitCode, 'photoHint')}
+            />
             <Button
               label={card.photoUri ? t('traitFlow.retakePhoto') : t('traitFlow.takePhoto')}
               variant="secondary"
@@ -268,7 +299,7 @@ export function TraitInfectionsScreen({
               }
             />
             <Button
-              label={t('traitFlow.deleteInfection')}
+              label={getTraitFlowText(route.params.traitCode, 'deleteCard')}
               variant="ghost"
               onPress={() =>
                 removeInfectionCard(
@@ -283,7 +314,7 @@ export function TraitInfectionsScreen({
         ))}
 
         <Button
-          label={t('traitFlow.addInfection')}
+          label={getTraitFlowText(route.params.traitCode, 'addCard')}
           onPress={() =>
             addInfectionCard(
               route.params.traitCode,
@@ -307,7 +338,7 @@ export function TraitInfectionsScreen({
         {hasIncompleteCards ? (
           <Text style={styles.helpText}>{t('traitFlow.incompleteHint')}</Text>
         ) : plotDraft.infections.length === 0 ? (
-          <Text style={styles.helpText}>{t('traitFlow.infectionEmpty')}</Text>
+          <Text style={styles.helpText}>{getTraitFlowText(route.params.traitCode, 'empty')}</Text>
         ) : null}
       </Card>
     </Screen>
@@ -373,12 +404,17 @@ export function TraitReviewScreen({
       </Card>
 
       <Card>
-        <Text style={styles.sectionTitle}>{t('traitFlow.reviewCards')}</Text>
+        <Text style={styles.sectionTitle}>
+          {getTraitFlowText(route.params.traitCode, 'reviewCards')}
+        </Text>
         {plotDraft.infections.length ? (
           plotDraft.infections.map((card, index) => (
             <View key={card.id} style={styles.infectionSummary}>
-              <Text style={styles.cardTitle}>{infectionLabel(index)}</Text>
-              <PhotoFrame uri={card.photoUri} fallback={t('traitFlow.infectionPhotoHint')} />
+              <Text style={styles.cardTitle}>{cardLabel(route.params.traitCode, index)}</Text>
+              <PhotoFrame
+                uri={card.photoUri}
+                fallback={getTraitFlowText(route.params.traitCode, 'photoHint')}
+              />
               <Text style={uiStyles.paragraph}>
                 {t('traitFlow.plantReviewPrefix')} {card.plantNumber || '-'},
                 {' '}{t('traitFlow.rowReviewPrefix')} {card.rowNumber || '-'}
@@ -386,7 +422,7 @@ export function TraitReviewScreen({
             </View>
           ))
         ) : (
-          <Text style={styles.emptyState}>{t('traitFlow.infectionEmpty')}</Text>
+          <Text style={styles.emptyState}>{getTraitFlowText(route.params.traitCode, 'empty')}</Text>
         )}
       </Card>
 
