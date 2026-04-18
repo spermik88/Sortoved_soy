@@ -35,6 +35,7 @@ export interface TraitPlotDraft {
   plotIndex: number;
   overviewPhoto?: string;
   infections: InfectionCard[];
+  confirmedAt?: string;
   syncStatus: 'idle' | 'queued' | 'syncing' | 'synced' | 'failed';
   lastSyncAt?: string;
   lastQueuedAt?: string;

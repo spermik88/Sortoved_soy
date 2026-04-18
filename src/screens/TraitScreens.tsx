@@ -1,5 +1,5 @@
-import React, { useMemo, useState } from 'react';
-import { Alert, Linking, StyleSheet, Text, View } from 'react-native';
+import React, { useState } from 'react';
+import { Linking, StyleSheet, Text, View } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import {
@@ -8,7 +8,6 @@ import {
   EmptyState,
   Field,
   LinkText,
-  LoadingBlock,
   PhotoFrame,
   Screen,
   StatPill,
@@ -329,54 +328,32 @@ export function TraitReviewScreen({
   const completedPlots = getCompletedPlotsCount(route.params.traitCode, route.params.varietyId);
   const [submitting, setSubmitting] = useState(false);
 
-  const nextAction = useMemo(() => {
-    return route.params.plotIndex < 3
-      ? {
-          label: t('traitFlow.goToNextPlot'),
-          onDone: () =>
-            navigation.replace('TraitOverview', {
-              traitCode: route.params.traitCode,
-              varietyId: route.params.varietyId,
-              plotIndex: route.params.plotIndex + 1,
-            }),
-        }
-      : {
-          label: t('traitFlow.goToVariety'),
-          onDone: () =>
-            navigation.reset({
-              index: 0,
-              routes: [
-                { name: 'MainMenu' },
-                { name: 'Varieties' },
-                { name: 'VarietyDetail', params: { varietyId: route.params.varietyId } },
-              ],
-            }),
-        };
-  }, [navigation, route.params.plotIndex, route.params.traitCode, route.params.varietyId]);
-
   if (!variety) {
     return null;
   }
 
-  const submit = async () => {
+  const submit = () => {
+    if (submitting) {
+      return;
+    }
+
     setSubmitting(true);
-    const result = await confirmTraitPlot(
-      route.params.traitCode,
-      route.params.varietyId,
-      route.params.plotIndex,
-    );
-    setSubmitting(false);
+    confirmTraitPlot(route.params.traitCode, route.params.varietyId, route.params.plotIndex);
 
-    Alert.alert(
-      result === 'synced' ? t('traitFlow.saveSuccessTitle') : t('traitFlow.saveQueuedTitle'),
-      result === 'synced' ? t('traitFlow.saveSuccessMessage') : t('traitFlow.saveQueuedMessage'),
-      [{ text: nextAction.label, onPress: nextAction.onDone }],
-    );
+    if (route.params.plotIndex < 3) {
+      navigation.replace('TraitOverview', {
+        traitCode: route.params.traitCode,
+        varietyId: route.params.varietyId,
+        plotIndex: route.params.plotIndex + 1,
+      });
+      return;
+    }
+
+    navigation.replace('TraitCompletion', {
+      traitCode: route.params.traitCode,
+      varietyId: route.params.varietyId,
+    });
   };
-
-  if (submitting) {
-    return <LoadingBlock label={t('traitFlow.queueProcessing')} />;
-  }
 
   return (
     <Screen>
@@ -419,10 +396,51 @@ export function TraitReviewScreen({
             ? t('traitFlow.queueSynced')
             : plotDraft.syncStatus === 'queued'
               ? t('traitFlow.queueQueued')
-              : t('traitFlow.statusIdle')}
+              : plotDraft.syncStatus === 'syncing'
+                ? t('traitFlow.statusProcessing')
+                : t('traitFlow.statusIdle')}
         </Text>
         <Button label={t('common.back')} variant="ghost" onPress={() => navigation.goBack()} />
-        <Button label={t('traitFlow.confirmData')} onPress={() => void submit()} />
+        <Button label={t('common.next')} disabled={submitting} onPress={() => void submit()} />
+      </Card>
+    </Screen>
+  );
+}
+
+export function TraitCompletionScreen({
+  route,
+  navigation,
+}: NativeStackScreenProps<RootStackParamList, 'TraitCompletion'>) {
+  const trait = getTraitDefinition(route.params.traitCode);
+  const variety = useVariety(route.params.varietyId);
+
+  if (!variety) {
+    return null;
+  }
+
+  return (
+    <Screen>
+      <Title subtitle={trait.title}>{variety.title}</Title>
+
+      <Card>
+        <Text style={styles.sectionTitle}>{t('traitFlow.completionTitle')}</Text>
+        <Text style={uiStyles.paragraph}>{t('traitFlow.completionDescription')}</Text>
+      </Card>
+
+      <Card>
+        <Button
+          label={t('traitFlow.goToVariety')}
+          onPress={() =>
+            navigation.reset({
+              index: 0,
+              routes: [
+                { name: 'MainMenu' },
+                { name: 'Varieties' },
+                { name: 'VarietyDetail', params: { varietyId: route.params.varietyId } },
+              ],
+            })
+          }
+        />
       </Card>
     </Screen>
   );

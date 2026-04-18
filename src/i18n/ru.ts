@@ -19,7 +19,8 @@ export const ru = {
     collector: 'Сборщик данных',
     analyst: 'Аналитик данных',
     manager: 'Руководитель',
-    placeholderDescription: 'Основная реализация в текущем v1 сделана для роли сборщика данных.',
+    placeholderDescription:
+      'Основная реализация в текущем v1 сделана для роли сборщика данных.',
     chooseAgain: 'Сменить тип аккаунта',
   },
   qr: {
@@ -93,7 +94,7 @@ export const ru = {
     ofThree: 'из 3',
     step1Title: 'Шаг 1. Сделайте фотографию делянки',
     step2Title: 'Шаг 2. Отметьте зараженные растения',
-    step3Title: 'Шаг 3. Подтвердите пакет данных',
+    step3Title: 'Шаг 3. Проверьте пакет данных',
     step1Description:
       'Перед осмотром растений сфотографируйте текущее состояние делянки, на которой вы будете делать осмотр.',
     sourcePhotoMissing: 'Исходное фото делянки пока недоступно.',
@@ -127,6 +128,9 @@ export const ru = {
     plantReviewPrefix: 'Растение №',
     rowReviewPrefix: 'ряд №',
     confirmData: 'Подтвердить данные',
+    completionTitle: 'Ход завершён',
+    completionDescription:
+      'Все 3 делянки пройдены. Отправка данных продолжается в фоне или дождётся сети.',
     queueQueued: 'Пакет поставлен в очередь',
     queueSynced: 'Пакет синхронизирован',
     queueProcessing: 'Обрабатываем mock-sync пакет...',

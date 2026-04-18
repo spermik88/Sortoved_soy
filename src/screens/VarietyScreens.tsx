@@ -62,7 +62,13 @@ export function VarietyDetailScreen({
   navigation,
   route,
 }: NativeStackScreenProps<RootStackParamList, 'VarietyDetail'>) {
-  const { state, getAggregateTraitState, getLatestVarietySyncStatus, getNextTraitPlot } = useApp();
+  const {
+    state,
+    getAggregateTraitState,
+    getLatestVarietySyncStatus,
+    getNextTraitPlot,
+    getTraitCheckboxState,
+  } = useApp();
   const variety = state.varieties.find((item) => item.id === route.params.varietyId);
 
   if (!variety) {
@@ -83,7 +89,13 @@ export function VarietyDetailScreen({
         <Text style={styles.metaText}>{getSyncStatusText(latestStatus)}</Text>
 
         {TRAITS.map((trait) => {
-          const completed = variety.traitStatuses[trait.code] === 'completed';
+          const checkboxState = getTraitCheckboxState(trait.code, variety.id);
+          const checkbox =
+            checkboxState === 'fully_synced'
+              ? '[x][x]'
+              : checkboxState === 'completed_pending_sync'
+                ? '[x]'
+                : '[ ]';
 
           return (
             <Pressable
@@ -97,7 +109,7 @@ export function VarietyDetailScreen({
               }
               style={styles.traitRow}
             >
-              <Text style={styles.checkbox}>{completed ? '[x]' : '[ ]'}</Text>
+              <Text style={styles.checkbox}>{checkbox}</Text>
               <View style={styles.traitTextWrap}>
                 <Text style={styles.traitText}>{trait.title}</Text>
               </View>

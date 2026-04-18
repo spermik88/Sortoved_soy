@@ -33,7 +33,7 @@ export function computeTraitState(draft: TraitDraft | undefined): TraitState {
   }
 
   const plots = Object.values(draft.plots);
-  if (plots.length >= 3 && plots.every((plot) => plot.syncStatus === 'synced')) {
+  if (plots.length >= 3 && plots.every((plot) => plot.confirmedAt)) {
     return 'completed';
   }
 
@@ -62,7 +62,23 @@ export function getCompletedPlotsCount(draft: TraitDraft | undefined) {
     return 0;
   }
 
+  return Object.values(draft.plots).filter((plot) => plot.confirmedAt).length;
+}
+
+export function getSyncedPlotsCount(draft: TraitDraft | undefined) {
+  if (!draft) {
+    return 0;
+  }
+
   return Object.values(draft.plots).filter((plot) => plot.syncStatus === 'synced').length;
+}
+
+export function isTraitRouteCompleted(draft: TraitDraft | undefined) {
+  return getCompletedPlotsCount(draft) >= 3;
+}
+
+export function isTraitFullySynced(draft: TraitDraft | undefined) {
+  return getSyncedPlotsCount(draft) >= 3;
 }
 
 export function getLatestPlotStatus(

@@ -13,4 +13,5 @@ export type RootStackParamList = {
   TraitOverview: { traitCode: TraitCode; varietyId: string; plotIndex: number };
   TraitInfections: { traitCode: TraitCode; varietyId: string; plotIndex: number };
   TraitReview: { traitCode: TraitCode; varietyId: string; plotIndex: number };
+  TraitCompletion: { traitCode: TraitCode; varietyId: string };
 };

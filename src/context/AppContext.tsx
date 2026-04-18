@@ -32,6 +32,9 @@ import {
   getCompletedPlotsCount as countCompletedPlots,
   getLatestPlotStatus,
   getOrCreatePlotDraft,
+  getSyncedPlotsCount as countSyncedPlots,
+  isTraitFullySynced,
+  isTraitRouteCompleted,
   isInfectionCardComplete,
 } from './appStateUtils';
 
@@ -159,19 +162,20 @@ interface AppContextValue {
     plotIndex: number,
     cardId: string,
   ) => void;
-  confirmTraitPlot: (
-    traitCode: TraitCode,
-    varietyId: string,
-    plotIndex: number,
-  ) => Promise<'synced' | 'queued'>;
+  confirmTraitPlot: (traitCode: TraitCode, varietyId: string, plotIndex: number) => void;
   getTraitPlotDraft: (traitCode: TraitCode, varietyId: string, plotIndex: number) => TraitPlotDraft;
   getNextTraitPlot: (traitCode: TraitCode, varietyId: string) => number;
   getCompletedPlotsCount: (traitCode: TraitCode, varietyId: string) => number;
+  getSyncedPlotsCount: (traitCode: TraitCode, varietyId: string) => number;
   getLatestVarietySyncStatus: (
     traitCode: TraitCode,
     varietyId: string,
   ) => TraitPlotDraft['syncStatus'] | SyncTaskStatus | 'idle';
   getAggregateTraitState: (varietyId: string) => TraitState;
+  getTraitCheckboxState: (
+    traitCode: TraitCode,
+    varietyId: string,
+  ) => 'not_started' | 'completed_pending_sync' | 'fully_synced';
 }
 
 const AppContext = createContext<AppContextValue | undefined>(undefined);
@@ -561,9 +565,27 @@ export function AppProvider({ children }: { children: ReactNode }) {
           return updateVarietyTraitStatus(nextState, varietyId, traitCode);
         });
       },
-      async confirmTraitPlot(traitCode, varietyId, plotIndex) {
+      confirmTraitPlot(traitCode, varietyId, plotIndex) {
         const draft = getTraitDraft(stateRef.current, varietyId, traitCode);
         const plotDraft = getOrCreatePlotDraft(draft, plotIndex);
+        const existingTask = stateRef.current.syncQueue.find(
+          (task) =>
+            task.traitCode === traitCode &&
+            task.varietyId === varietyId &&
+            task.plotIndex === plotIndex,
+        );
+
+        if (
+          plotDraft.confirmedAt &&
+          existingTask
+        ) {
+          return;
+        }
+
+        if (plotDraft.confirmedAt && plotDraft.syncStatus === 'synced') {
+          return;
+        }
+
         const taskId = createId('sync');
         const now = new Date().toISOString();
         const task: SyncTask = {
@@ -592,6 +614,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
               ...currentDraft?.plots,
               [String(plotIndex)]: {
                 ...getOrCreatePlotDraft(currentDraft, plotIndex),
+                confirmedAt: currentDraft?.plots[String(plotIndex)]?.confirmedAt || now,
                 syncStatus: 'queued',
                 lastQueuedAt: now,
               },
@@ -606,7 +629,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
           return updateVarietyTraitStatus(queuedState, varietyId, traitCode);
         });
 
-        return processTask(taskId);
+        void processTask(taskId);
       },
       getTraitPlotDraft(traitCode, varietyId, plotIndex) {
         return getOrCreatePlotDraft(getTraitDraft(state, varietyId, traitCode), plotIndex);
@@ -615,7 +638,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         const plots = getTraitDraft(state, varietyId, traitCode)?.plots || {};
 
         for (const plotIndex of [1, 2, 3]) {
-          if (plots[String(plotIndex)]?.syncStatus !== 'synced') {
+          if (!plots[String(plotIndex)]?.confirmedAt) {
             return plotIndex;
           }
         }
@@ -624,6 +647,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
       },
       getCompletedPlotsCount(traitCode, varietyId) {
         return countCompletedPlots(getTraitDraft(state, varietyId, traitCode));
+      },
+      getSyncedPlotsCount(traitCode, varietyId) {
+        return countSyncedPlots(getTraitDraft(state, varietyId, traitCode));
       },
       getLatestVarietySyncStatus(traitCode, varietyId) {
         return getLatestPlotStatus(getTraitDraft(state, varietyId, traitCode));
@@ -645,6 +671,19 @@ export function AppProvider({ children }: { children: ReactNode }) {
         }
 
         return 'in_progress';
+      },
+      getTraitCheckboxState(traitCode, varietyId) {
+        const draft = getTraitDraft(state, varietyId, traitCode);
+
+        if (isTraitFullySynced(draft)) {
+          return 'fully_synced';
+        }
+
+        if (isTraitRouteCompleted(draft)) {
+          return 'completed_pending_sync';
+        }
+
+        return 'not_started';
       },
     }),
     [hydrated, state],

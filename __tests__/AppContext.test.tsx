@@ -19,6 +19,7 @@ function Probe() {
       <Text testID="varieties">{String(app.state.varieties.length)}</Text>
       <Text testID="infections">{String(draft.infections.length)}</Text>
       <Text testID="aggregate">{app.getAggregateTraitState('test-variety')}</Text>
+      <Text testID="next-plot">{String(app.getNextTraitPlot('fusarium', 'test-variety'))}</Text>
       <Button title="collector" onPress={() => app.selectRole('collector')} />
       <Button title="test-mode" onPress={() => app.enableTestMode()} />
       <Button
@@ -37,6 +38,10 @@ function Probe() {
             });
           }
         }}
+      />
+      <Button
+        title="confirm-plot"
+        onPress={() => app.confirmTraitPlot('fusarium', 'test-variety', 1)}
       />
     </>
   );
@@ -59,6 +64,7 @@ describe('AppProvider', () => {
       fireEvent.press(screen.getByText('test-mode'));
       fireEvent.press(screen.getByText('add-card'));
       fireEvent.press(screen.getByText('fill-card'));
+      fireEvent.press(screen.getByText('confirm-plot'));
     });
 
     expect(screen.getByTestId('role').props.children).toBe('collector');
@@ -66,5 +72,6 @@ describe('AppProvider', () => {
     expect(screen.getByTestId('varieties').props.children).toBe('1');
     expect(screen.getByTestId('infections').props.children).toBe('1');
     expect(screen.getByTestId('aggregate').props.children).toBe('in_progress');
+    expect(screen.getByTestId('next-plot').props.children).toBe('2');
   });
 });

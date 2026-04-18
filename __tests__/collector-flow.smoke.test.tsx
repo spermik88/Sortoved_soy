@@ -34,6 +34,8 @@ jest.mock('../src/context/AppContext', () => ({
     getCompletedPlotsCount: () => 1,
     getLatestVarietySyncStatus: () => 'queued',
     getAggregateTraitState: () => 'in_progress',
+    getTraitCheckboxState: (traitCode: string) =>
+      traitCode === 'aphid_damage' ? 'completed_pending_sync' : 'fully_synced',
   }),
 }));
 
@@ -68,5 +70,7 @@ describe('collector flow smoke', () => {
     expect(screen.getByText('Активные ходы в работе')).toBeTruthy();
     expect(screen.getByText('2. Септориоз')).toBeTruthy();
     expect(screen.getByText('9. Повреждение тлей')).toBeTruthy();
+    expect(screen.getAllByText('[x][x]').length).toBeGreaterThan(0);
+    expect(screen.getByText('[x]')).toBeTruthy();
   });
 });

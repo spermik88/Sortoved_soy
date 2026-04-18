@@ -6,6 +6,7 @@ import { LoadingBlock } from '../components/Ui';
 import { useApp } from '../context/AppContext';
 import { t } from '../i18n';
 import {
+  TraitCompletionScreen,
   TraitInfectionsScreen,
   TraitOverviewScreen,
   TraitReviewScreen,
@@ -71,6 +72,7 @@ export function AppNavigator() {
         <Stack.Screen name="TraitOverview" component={TraitOverviewScreen} />
         <Stack.Screen name="TraitInfections" component={TraitInfectionsScreen} />
         <Stack.Screen name="TraitReview" component={TraitReviewScreen} />
+        <Stack.Screen name="TraitCompletion" component={TraitCompletionScreen} />
       </Stack.Navigator>
     </NavigationContainer>
   );

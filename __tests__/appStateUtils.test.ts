@@ -4,6 +4,9 @@ import {
   getCompletedPlotsCount,
   getLatestPlotStatus,
   getOrCreatePlotDraft,
+  getSyncedPlotsCount,
+  isTraitFullySynced,
+  isTraitRouteCompleted,
   isInfectionCardComplete,
 } from '../src/context/appStateUtils';
 import { TraitDraft } from '../src/types/app';
@@ -41,14 +44,32 @@ describe('appStateUtils', () => {
       traitCode: 'fusarium',
       lastUpdated: '2026-04-18T00:00:00.000Z',
       plots: {
-        '1': { plotIndex: 1, infections: [], syncStatus: 'synced' },
-        '2': { plotIndex: 2, infections: [], syncStatus: 'synced' },
-        '3': { plotIndex: 3, infections: [], syncStatus: 'synced' },
+        '1': {
+          plotIndex: 1,
+          infections: [],
+          confirmedAt: '2026-04-18T09:00:00.000Z',
+          syncStatus: 'synced',
+        },
+        '2': {
+          plotIndex: 2,
+          infections: [],
+          confirmedAt: '2026-04-18T09:10:00.000Z',
+          syncStatus: 'synced',
+        },
+        '3': {
+          plotIndex: 3,
+          infections: [],
+          confirmedAt: '2026-04-18T09:20:00.000Z',
+          syncStatus: 'synced',
+        },
       },
     };
 
     expect(computeTraitState(draft)).toBe('completed');
     expect(getCompletedPlotsCount(draft)).toBe(3);
+    expect(getSyncedPlotsCount(draft)).toBe(3);
+    expect(isTraitRouteCompleted(draft)).toBe(true);
+    expect(isTraitFullySynced(draft)).toBe(true);
   });
 
   it('derives latest status from timestamps', () => {
@@ -60,12 +81,14 @@ describe('appStateUtils', () => {
         '1': {
           plotIndex: 1,
           infections: [],
+          confirmedAt: '2026-04-18T10:00:00.000Z',
           syncStatus: 'queued',
           lastQueuedAt: '2026-04-18T10:00:00.000Z',
         },
         '2': {
           plotIndex: 2,
           infections: [],
+          confirmedAt: '2026-04-18T11:00:00.000Z',
           syncStatus: 'synced',
           lastSyncAt: '2026-04-18T11:00:00.000Z',
         },
@@ -73,6 +96,28 @@ describe('appStateUtils', () => {
     };
 
     expect(getLatestPlotStatus(draft)).toBe('synced');
+  });
+
+  it('treats queued confirmed plots as completed for route progress', () => {
+    const draft: TraitDraft = {
+      varietyId: 'v1',
+      traitCode: 'fusarium',
+      lastUpdated: '2026-04-18T00:00:00.000Z',
+      plots: {
+        '1': {
+          plotIndex: 1,
+          infections: [],
+          confirmedAt: '2026-04-18T10:00:00.000Z',
+          syncStatus: 'queued',
+          lastQueuedAt: '2026-04-18T10:00:00.000Z',
+        },
+      },
+    };
+
+    expect(getCompletedPlotsCount(draft)).toBe(1);
+    expect(getSyncedPlotsCount(draft)).toBe(0);
+    expect(isTraitRouteCompleted(draft)).toBe(false);
+    expect(isTraitFullySynced(draft)).toBe(false);
   });
 
   it('computes aggregate trait state across active flows', () => {
