@@ -5,23 +5,31 @@ import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import {
   Button,
   Card,
+  EmptyState,
   Field,
   LinkText,
   LoadingBlock,
   PhotoFrame,
   Screen,
   StatPill,
+  StepIndicator,
   Title,
   uiStyles,
 } from '../components/Ui';
 import { colors } from '../constants/theme';
 import { useApp } from '../context/AppContext';
+import { t } from '../i18n';
 import { RootStackParamList } from '../navigation/types';
 import { cameraService } from '../services/cameraService';
+import { getSyncStatusText } from '../utils/syncStatus';
 
 function useVariety(varietyId: string) {
   const { state } = useApp();
   return state.varieties.find((variety) => variety.id === varietyId) || null;
+}
+
+function subtitle(plotIndex: number) {
+  return `${t('fusarium.title')}\n${t('fusarium.plotLabel')} ${plotIndex} ${t('fusarium.ofThree')}`;
 }
 
 export function FusariumOverviewScreen({
@@ -29,7 +37,7 @@ export function FusariumOverviewScreen({
   navigation,
 }: NativeStackScreenProps<RootStackParamList, 'FusariumOverview'>) {
   const variety = useVariety(route.params.varietyId);
-  const { getFusariumPlotDraft, saveOverviewPhoto } = useApp();
+  const { getCompletedPlotsCount, getFusariumPlotDraft, saveOverviewPhoto } = useApp();
   const [permissionDenied, setPermissionDenied] = useState(false);
   const plotDraft = getFusariumPlotDraft(route.params.varietyId, route.params.plotIndex);
 
@@ -40,6 +48,7 @@ export function FusariumOverviewScreen({
   const plotPhoto = variety.plotPhotos.find(
     (item) => item.plotIndex === route.params.plotIndex,
   );
+  const completedPlots = getCompletedPlotsCount(route.params.varietyId);
 
   const onCapture = async () => {
     const result = await cameraService.capturePhoto();
@@ -56,57 +65,44 @@ export function FusariumOverviewScreen({
 
   return (
     <Screen>
-      <Title subtitle={`1. Фузариоз\nДелянка ${route.params.plotIndex} из 3`}>
-        {variety.title}
-      </Title>
+      <Title subtitle={subtitle(route.params.plotIndex)}>{variety.title}</Title>
 
       <Card>
-        <Text style={uiStyles.paragraph}>
-          Перед осмотром растений сфотографируйте текущее состояние делянки, на
-          которой вы будете делать осмотр.
+        <StepIndicator current={1} total={3} />
+        <StatPill label={`${t('fusarium.currentStep')}: ${t('fusarium.step1Title')}`} />
+        <Text style={styles.metaText}>
+          {t('fusarium.donePlots')}: {completedPlots}/3
         </Text>
-
-        <Text style={styles.sectionTitle}>Делянка {route.params.plotIndex}</Text>
-        <PhotoFrame
-          uri={plotPhoto?.imageUri}
-          fallback="Исходное фото делянки пока недоступно."
-        />
+        <Text style={styles.metaText}>{getSyncStatusText(plotDraft.syncStatus)}</Text>
+        <Text style={uiStyles.paragraph}>{t('fusarium.step1Description')}</Text>
+        <Text style={styles.sectionTitle}>
+          {t('fusarium.plotLabel')} {route.params.plotIndex}
+        </Text>
+        <PhotoFrame uri={plotPhoto?.imageUri} fallback={t('fusarium.sourcePhotoMissing')} />
         <LinkText
-          label={
-            plotPhoto?.mapsUrl ? 'Открыть геометку снимка в Google Maps' : 'Геометка недоступна'
-          }
+          label={plotPhoto?.mapsUrl ? t('fusarium.mapAvailable') : t('fusarium.mapMissing')}
           url={plotPhoto?.mapsUrl}
         />
       </Card>
 
       <Card>
-        <Text style={styles.sectionTitle}>Шаг 1. Сделайте фотографию делянки</Text>
-        <PhotoFrame
-          uri={plotDraft.overviewPhoto}
-          fallback="После съемки здесь появится превью вашей фотографии."
-        />
+        <Text style={styles.sectionTitle}>{t('fusarium.step1Title')}</Text>
+        <PhotoFrame uri={plotDraft.overviewPhoto} fallback={t('fusarium.overviewMissing')} />
 
         {permissionDenied ? (
           <Card>
-            <Text style={uiStyles.paragraph}>
-              Доступ к камере отключен. Разрешите его в системных настройках,
-              чтобы продолжить съемку.
-            </Text>
-            <Button
-              label="Открыть настройки"
-              onPress={() => {
-                void Linking.openSettings();
-              }}
-            />
+            <Text style={uiStyles.paragraph}>{t('fusarium.permissionDenied')}</Text>
+            <Button label={t('common.openSettings')} onPress={() => void Linking.openSettings()} />
           </Card>
         ) : null}
 
         <Button
-          label={plotDraft.overviewPhoto ? 'Сделать фото заново' : 'Сделать фото'}
+          label={plotDraft.overviewPhoto ? t('fusarium.retakePhoto') : t('fusarium.takePhoto')}
           onPress={() => void onCapture()}
         />
+        <Button label={t('common.back')} variant="ghost" onPress={() => navigation.goBack()} />
         <Button
-          label="Далее"
+          label={t('common.next')}
           disabled={!plotDraft.overviewPhoto}
           onPress={() =>
             navigation.navigate('FusariumInfections', {
@@ -115,6 +111,9 @@ export function FusariumOverviewScreen({
             })
           }
         />
+        {!plotDraft.overviewPhoto ? (
+          <Text style={styles.helpText}>{t('fusarium.noOverviewCantContinue')}</Text>
+        ) : null}
       </Card>
     </Screen>
   );
@@ -124,11 +123,18 @@ export function FusariumInfectionsScreen({
   route,
   navigation,
 }: NativeStackScreenProps<RootStackParamList, 'FusariumInfections'>) {
-  const { getFusariumPlotDraft, addInfectionCard, updateInfectionCard } = useApp();
+  const {
+    addInfectionCard,
+    getCompletedPlotsCount,
+    getFusariumPlotDraft,
+    removeInfectionCard,
+    updateInfectionCard,
+  } = useApp();
   const variety = useVariety(route.params.varietyId);
   const [permissionDenied, setPermissionDenied] = useState(false);
   const plotDraft = getFusariumPlotDraft(route.params.varietyId, route.params.plotIndex);
   const hasIncompleteCards = plotDraft.infections.some((card) => !card.isComplete);
+  const completedPlots = getCompletedPlotsCount(route.params.varietyId);
   const sampleImages: string[] = [];
 
   if (!variety) {
@@ -152,61 +158,54 @@ export function FusariumInfectionsScreen({
 
   return (
     <Screen>
-      <Title subtitle={`1. Фузариоз\nДелянка ${route.params.plotIndex} из 3`}>
-        {variety.title}
-      </Title>
+      <Title subtitle={subtitle(route.params.plotIndex)}>{variety.title}</Title>
 
       <Card>
-        <Text style={uiStyles.paragraph}>
-          Тщательно осмотрите каждое растение на делянке на заражение
-          фузариозом. Сделайте фотографию каждого найденного заболевшего
-          растения и укажите его положение.
+        <StepIndicator current={2} total={3} />
+        <StatPill label={`${t('fusarium.currentStep')}: ${t('fusarium.step2Title')}`} />
+        <Text style={styles.metaText}>
+          {t('fusarium.donePlots')}: {completedPlots}/3
         </Text>
+        <Text style={uiStyles.paragraph}>{t('fusarium.infectionsIntro')}</Text>
       </Card>
 
       <Card>
-        <Text style={styles.sectionTitle}>Примеры заражения фузариозом</Text>
+        <Text style={styles.sectionTitle}>{t('fusarium.samplesTitle')}</Text>
         {sampleImages.length ? (
-          <Text style={uiStyles.paragraph}>Ассеты подключаются отдельно.</Text>
+          <Text style={uiStyles.paragraph}>{t('fusarium.samplesHint')}</Text>
         ) : (
-          <Text style={styles.emptyState}>Без изображений</Text>
+          <EmptyState title={t('fusarium.noSamples')} description={t('fusarium.samplesHint')} />
         )}
       </Card>
 
       {permissionDenied ? (
         <Card>
-          <Text style={uiStyles.paragraph}>
-            Без камеры нельзя добавить фото пораженного растения. Разрешите
-            доступ в системных настройках.
-          </Text>
-          <Button label="Открыть настройки" onPress={() => void Linking.openSettings()} />
+          <Text style={uiStyles.paragraph}>{t('fusarium.permissionDenied')}</Text>
+          <Button label={t('common.openSettings')} onPress={() => void Linking.openSettings()} />
         </Card>
       ) : null}
 
       <Card>
-        <Text style={styles.sectionTitle}>Карточки заражения</Text>
+        <Text style={styles.sectionTitle}>{t('fusarium.infectionCards')}</Text>
         {plotDraft.infections.map((card, index) => (
           <View key={card.id} style={styles.infectionCard}>
             <View style={styles.rowBetween}>
               <Text style={styles.cardTitle}>Заражение {index + 1}</Text>
               <StatPill
-                label={card.isComplete ? 'Заполнено' : 'Черновик'}
+                label={card.isComplete ? t('fusarium.infectionReady') : t('fusarium.infectionDraft')}
                 tone={card.isComplete ? 'success' : 'warning'}
               />
             </View>
-            <PhotoFrame
-              uri={card.photoUri}
-              fallback="Сделайте фото заболевшего растения."
-            />
+            <PhotoFrame uri={card.photoUri} fallback={t('fusarium.infectionPhotoHint')} />
             <Button
-              label={card.photoUri ? 'Сделать фото заново' : 'Сделать фото'}
+              label={card.photoUri ? t('fusarium.retakePhoto') : t('fusarium.takePhoto')}
               variant="secondary"
               onPress={() => void takeCardPhoto(card.id)}
             />
             <Field
-              label="№ растения в ряду"
+              label={t('fusarium.plantNumber')}
               keyboardType="numeric"
-              placeholder="Например, 7"
+              placeholder={t('fusarium.plantPlaceholder')}
               value={card.plantNumber}
               onChangeText={(value) =>
                 updateInfectionCard(route.params.varietyId, route.params.plotIndex, card.id, {
@@ -215,9 +214,9 @@ export function FusariumInfectionsScreen({
               }
             />
             <Field
-              label="№ ряда"
+              label={t('fusarium.rowNumber')}
               keyboardType="numeric"
-              placeholder="Например, 2"
+              placeholder={t('fusarium.rowPlaceholder')}
               value={card.rowNumber}
               onChangeText={(value) =>
                 updateInfectionCard(route.params.varietyId, route.params.plotIndex, card.id, {
@@ -225,15 +224,23 @@ export function FusariumInfectionsScreen({
                 })
               }
             />
+            <Button
+              label={t('fusarium.deleteInfection')}
+              variant="ghost"
+              onPress={() =>
+                removeInfectionCard(route.params.varietyId, route.params.plotIndex, card.id)
+              }
+            />
           </View>
         ))}
 
         <Button
-          label="Добавить заражение"
+          label={t('fusarium.addInfection')}
           onPress={() => addInfectionCard(route.params.varietyId, route.params.plotIndex)}
         />
+        <Button label={t('common.back')} variant="ghost" onPress={() => navigation.goBack()} />
         <Button
-          label="Далее"
+          label={t('common.next')}
           disabled={hasIncompleteCards}
           onPress={() =>
             navigation.navigate('FusariumReview', {
@@ -242,6 +249,11 @@ export function FusariumInfectionsScreen({
             })
           }
         />
+        {hasIncompleteCards ? (
+          <Text style={styles.helpText}>{t('fusarium.incompleteHint')}</Text>
+        ) : plotDraft.infections.length === 0 ? (
+          <Text style={styles.helpText}>{t('fusarium.infectionEmpty')}</Text>
+        ) : null}
       </Card>
     </Screen>
   );
@@ -251,15 +263,16 @@ export function FusariumReviewScreen({
   route,
   navigation,
 }: NativeStackScreenProps<RootStackParamList, 'FusariumReview'>) {
-  const { getFusariumPlotDraft, confirmFusariumPlot } = useApp();
+  const { confirmFusariumPlot, getCompletedPlotsCount, getFusariumPlotDraft } = useApp();
   const variety = useVariety(route.params.varietyId);
   const plotDraft = getFusariumPlotDraft(route.params.varietyId, route.params.plotIndex);
+  const completedPlots = getCompletedPlotsCount(route.params.varietyId);
   const [submitting, setSubmitting] = useState(false);
 
   const nextAction = useMemo(() => {
     return route.params.plotIndex < 3
       ? {
-          label: `Перейти к делянке ${route.params.plotIndex + 1}`,
+          label: t('fusarium.goToNextPlot'),
           onDone: () =>
             navigation.replace('FusariumOverview', {
               varietyId: route.params.varietyId,
@@ -267,7 +280,7 @@ export function FusariumReviewScreen({
             }),
         }
       : {
-          label: 'Вернуться к карточке сорта',
+          label: t('fusarium.goToVariety'),
           onDone: () =>
             navigation.reset({
               index: 0,
@@ -290,51 +303,58 @@ export function FusariumReviewScreen({
     setSubmitting(false);
 
     Alert.alert(
-      result === 'synced' ? 'Данные сохранены' : 'Данные поставлены в очередь',
-      result === 'synced'
-        ? `Делянка ${route.params.plotIndex} сохранена в локальный mock-sync пакет.`
-        : 'Пакет сохранен локально и будет обработан после появления сети.',
+      result === 'synced' ? t('fusarium.saveSuccessTitle') : t('fusarium.saveQueuedTitle'),
+      result === 'synced' ? t('fusarium.saveSuccessMessage') : t('fusarium.saveQueuedMessage'),
       [{ text: nextAction.label, onPress: nextAction.onDone }],
     );
   };
 
   if (submitting) {
-    return <LoadingBlock label="Подготавливаем пакет и обрабатываем mock sync..." />;
+    return <LoadingBlock label={t('fusarium.queueProcessing')} />;
   }
 
   return (
     <Screen>
-      <Title subtitle={`1. Фузариоз\nДелянка ${route.params.plotIndex} из 3`}>
-        {variety.title}
-      </Title>
+      <Title subtitle={subtitle(route.params.plotIndex)}>{variety.title}</Title>
 
       <Card>
-        <Text style={styles.sectionTitle}>Фото делянки</Text>
-        <PhotoFrame
-          uri={plotDraft.overviewPhoto}
-          fallback="Фотография делянки не добавлена."
-        />
+        <StepIndicator current={3} total={3} />
+        <StatPill label={`${t('fusarium.currentStep')}: ${t('fusarium.step3Title')}`} />
+        <Text style={styles.metaText}>
+          {t('fusarium.donePlots')}: {completedPlots}/3
+        </Text>
+        <Text style={styles.metaText}>{getSyncStatusText(plotDraft.syncStatus)}</Text>
+        <Text style={styles.sectionTitle}>{t('fusarium.reviewPlotPhoto')}</Text>
+        <PhotoFrame uri={plotDraft.overviewPhoto} fallback={t('fusarium.overviewMissing')} />
       </Card>
 
       <Card>
-        <Text style={styles.sectionTitle}>Карточки заражения</Text>
+        <Text style={styles.sectionTitle}>{t('fusarium.reviewCards')}</Text>
         {plotDraft.infections.length ? (
           plotDraft.infections.map((card, index) => (
             <View key={card.id} style={styles.infectionSummary}>
               <Text style={styles.cardTitle}>Заражение {index + 1}</Text>
-              <PhotoFrame uri={card.photoUri} fallback="Фото не добавлено" />
+              <PhotoFrame uri={card.photoUri} fallback={t('fusarium.infectionPhotoHint')} />
               <Text style={uiStyles.paragraph}>
-                Растение №{card.plantNumber || '—'}, ряд №{card.rowNumber || '—'}
+                Растение №{card.plantNumber || '-'}, ряд №{card.rowNumber || '-'}
               </Text>
             </View>
           ))
         ) : (
-          <Text style={styles.emptyState}>Зараженные растения не добавлены.</Text>
+          <Text style={styles.emptyState}>{t('fusarium.infectionEmpty')}</Text>
         )}
       </Card>
 
       <Card>
-        <Button label="Подтвердить данные" onPress={() => void submit()} />
+        <Text style={styles.metaText}>
+          {plotDraft.syncStatus === 'synced'
+            ? t('fusarium.queueSynced')
+            : plotDraft.syncStatus === 'queued'
+              ? t('fusarium.queueQueued')
+              : t('fusarium.statusIdle')}
+        </Text>
+        <Button label={t('common.back')} variant="ghost" onPress={() => navigation.goBack()} />
+        <Button label={t('fusarium.confirmData')} onPress={() => void submit()} />
       </Card>
     </Screen>
   );
@@ -370,5 +390,13 @@ const styles = StyleSheet.create({
     fontSize: 15,
     color: colors.textMuted,
     textAlign: 'center',
+  },
+  helpText: {
+    fontSize: 14,
+    color: colors.textMuted,
+  },
+  metaText: {
+    fontSize: 14,
+    color: colors.textMuted,
   },
 });

@@ -6,6 +6,7 @@ import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Button, Card, Screen, Title } from '../components/Ui';
 import { colors } from '../constants/theme';
 import { useApp } from '../context/AppContext';
+import { t } from '../i18n';
 import { RootStackParamList } from '../navigation/types';
 import { showToast } from '../utils/toast';
 
@@ -20,18 +21,18 @@ export function QrScannerScreen({ navigation, route }: Props) {
   const subtitle = useMemo(() => {
     switch (route.params.origin) {
       case 'settings':
-        return 'Отсканируйте ссылку на Google Таблицу аналитика';
+        return t('qr.subtitleSettings');
       case 'varieties':
-        return 'Добавьте еще один сорт через QR-код';
+        return t('qr.subtitleVarieties');
       default:
-        return 'Привяжите аккаунт сборщика к таблице аналитика';
+        return t('qr.subtitleOnboarding');
     }
   }, [route.params.origin]);
 
   if (!permission) {
     return (
       <Screen scroll={false}>
-        <Title>Сканирование QR-кода</Title>
+        <Title>{t('qr.title')}</Title>
       </Screen>
     );
   }
@@ -39,14 +40,12 @@ export function QrScannerScreen({ navigation, route }: Props) {
   if (!permission.granted) {
     return (
       <Screen>
-        <Title subtitle={subtitle}>Сканирование QR-кода</Title>
+        <Title subtitle={subtitle}>{t('qr.title')}</Title>
         <Card>
-          <Text style={styles.text}>
-            Без доступа к камере приложение не сможет считать QR-код аналитика.
-          </Text>
-          <Button label="Разрешить доступ к камере" onPress={() => void requestPermission()} />
+          <Text style={styles.text}>{t('qr.noPermission')}</Text>
+          <Button label={t('qr.requestPermission')} onPress={() => void requestPermission()} />
           <Button
-            label="Пропустить шаг"
+            label={t('qr.skip')}
             variant="ghost"
             onPress={() => navigation.navigate('TestModeWarning')}
           />
@@ -57,7 +56,7 @@ export function QrScannerScreen({ navigation, route }: Props) {
 
   return (
     <Screen>
-      <Title subtitle={subtitle}>Сканирование QR-кода</Title>
+      <Title subtitle={subtitle}>{t('qr.title')}</Title>
 
       <Card>
         <View style={styles.cameraWrap}>
@@ -78,7 +77,7 @@ export function QrScannerScreen({ navigation, route }: Props) {
                     }
 
                     if (result.duplicate) {
-                      showToast('Сорт уже добавлен');
+                      showToast(t('qr.duplicate'));
                       setScanned(false);
                       return;
                     }
@@ -89,14 +88,12 @@ export function QrScannerScreen({ navigation, route }: Props) {
           />
         </View>
 
-        <Text style={styles.text}>
-          Наведите камеру на QR-код со ссылкой на Google Таблицу.
-        </Text>
+        <Text style={styles.text}>{t('qr.scanHint')}</Text>
 
         {error ? <Text style={styles.error}>{error}</Text> : null}
 
         <Button
-          label="Сканировать снова"
+          label={t('qr.rescan')}
           variant="secondary"
           onPress={() => {
             setError(null);
@@ -104,7 +101,7 @@ export function QrScannerScreen({ navigation, route }: Props) {
           }}
         />
         <Button
-          label="Пропустить шаг"
+          label={t('qr.skip')}
           variant="ghost"
           onPress={() => navigation.navigate('TestModeWarning')}
         />

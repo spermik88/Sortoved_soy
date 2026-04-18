@@ -1,3 +1,4 @@
+import { t } from '../i18n';
 import { PlotPhoto } from '../types/app';
 import { createId } from '../utils/id';
 
@@ -18,7 +19,7 @@ function normalizeUrl(raw: string) {
   const url = new URL(trimmed);
 
   if (!['http:', 'https:'].includes(url.protocol)) {
-    throw new Error('QR-код должен содержать ссылку.');
+    throw new Error(t('qr.invalidUrl'));
   }
 
   return url.toString();

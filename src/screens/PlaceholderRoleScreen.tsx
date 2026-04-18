@@ -3,24 +3,21 @@ import { Text } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import { Button, Card, Screen, Title } from '../components/Ui';
+import { t } from '../i18n';
 import { RootStackParamList } from '../navigation/types';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'PlaceholderRole'>;
 
 export function PlaceholderRoleScreen({ route, navigation }: Props) {
-  const title =
-    route.params.role === 'analyst' ? 'Аналитик данных' : 'Руководитель';
+  const title = route.params.role === 'analyst' ? t('role.analyst') : t('role.manager');
 
   return (
     <Screen>
       <Title>{title}</Title>
       <Card>
-        <Text style={{ fontSize: 16, lineHeight: 24 }}>
-          Этот поток пока оставлен каркасом. Основная реализация в v1 сделана
-          для роли сборщика данных.
-        </Text>
+        <Text style={{ fontSize: 16, lineHeight: 24 }}>{t('role.placeholderDescription')}</Text>
         <Button
-          label="Сменить тип аккаунта"
+          label={t('role.chooseAgain')}
           variant="secondary"
           onPress={() => navigation.replace('RoleSelection')}
         />

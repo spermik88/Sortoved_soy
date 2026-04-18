@@ -3,8 +3,9 @@ import { StyleSheet, Text } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import { Button, Card, Screen, Title } from '../components/Ui';
-import { RootStackParamList } from '../navigation/types';
 import { useApp } from '../context/AppContext';
+import { t } from '../i18n';
+import { RootStackParamList } from '../navigation/types';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'RoleSelection'>;
 
@@ -13,21 +14,19 @@ export function RoleSelectionScreen({ navigation }: Props) {
 
   return (
     <Screen>
-      <Title subtitle="Тип аккаунта можно изменить позже в настройках">
-        Выберите тип аккаунта
-      </Title>
+      <Title subtitle={t('role.selectSubtitle')}>{t('role.selectTitle')}</Title>
 
       <Card>
-        <Text style={styles.text}>Кем вы будете работать в приложении?</Text>
+        <Text style={styles.text}>{t('role.selectDescription')}</Text>
         <Button
-          label="Сборщик данных"
+          label={t('role.collector')}
           onPress={() => {
             selectRole('collector');
             navigation.replace('QrScanner', { origin: 'onboarding' });
           }}
         />
         <Button
-          label="Аналитик данных"
+          label={t('role.analyst')}
           variant="secondary"
           onPress={() => {
             selectRole('analyst');
@@ -35,7 +34,7 @@ export function RoleSelectionScreen({ navigation }: Props) {
           }}
         />
         <Button
-          label="Руководитель"
+          label={t('role.manager')}
           variant="secondary"
           onPress={() => {
             selectRole('manager');

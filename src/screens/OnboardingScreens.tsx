@@ -4,6 +4,7 @@ import { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import { Button, Card, Screen, StatPill, Title, uiStyles } from '../components/Ui';
 import { useApp } from '../context/AppContext';
+import { t } from '../i18n';
 import { RootStackParamList } from '../navigation/types';
 
 export function QrValidationScreen({
@@ -18,12 +19,12 @@ export function QrValidationScreen({
 
   return (
     <Screen>
-      <Title subtitle="Валидация ссылки">{state.pendingVariety.title}</Title>
+      <Title subtitle={t('qr.validationTitle')}>{state.pendingVariety.title}</Title>
       <Card>
-        <Text style={styles.centerText}>Добавить сорт?</Text>
-        <StatPill label="Ссылка распознана" tone="success" />
+        <Text style={styles.centerText}>{t('qr.addVarietyQuestion')}</Text>
+        <StatPill label={t('qr.linkResolved')} tone="success" />
         <Button
-          label="Да"
+          label={t('qr.yes')}
           onPress={() => {
             confirmPendingVariety();
             navigation.reset({
@@ -33,7 +34,7 @@ export function QrValidationScreen({
           }}
         />
         <Button
-          label="Назад"
+          label={t('common.back')}
           variant="secondary"
           onPress={() => {
             clearPendingVariety();
@@ -52,15 +53,11 @@ export function TestModeWarningScreen({
 
   return (
     <Screen>
-      <Title>Тестовый режим</Title>
+      <Title>{t('testMode.title')}</Title>
       <Card>
-        <Text style={uiStyles.paragraph}>
-          Это тестовый режим. Прогресс будет храниться только локально на
-          устройстве. Позже вы сможете добавить QR-код аналитика в настройках и
-          переключиться на полноценную рабочую связку.
-        </Text>
+        <Text style={uiStyles.paragraph}>{t('testMode.description')}</Text>
         <Button
-          label="Ок"
+          label={t('testMode.ok')}
           onPress={() => {
             enableTestMode();
             navigation.reset({
@@ -69,7 +66,7 @@ export function TestModeWarningScreen({
             });
           }}
         />
-        <Button label="Назад" variant="secondary" onPress={() => navigation.goBack()} />
+        <Button label={t('common.back')} variant="secondary" onPress={() => navigation.goBack()} />
       </Card>
     </Screen>
   );
@@ -83,19 +80,17 @@ export function MainMenuScreen({
 
   return (
     <Screen>
-      <Title subtitle={isTestMode ? 'Тестовый режим' : 'Рабочий режим'}>
-        Главное меню
+      <Title subtitle={isTestMode ? t('menu.testMode') : t('menu.workingMode')}>
+        {t('menu.title')}
       </Title>
 
       <Card>
         <Text style={styles.centerText}>
-          {isTestMode
-            ? 'Можно проходить шаги и сохранять данные локально.'
-            : 'Выберите раздел для продолжения работы.'}
+          {isTestMode ? t('menu.testDescription') : t('menu.workingDescription')}
         </Text>
-        <Button label="Сорта" onPress={() => navigation.navigate('Varieties')} />
+        <Button label={t('menu.varieties')} onPress={() => navigation.navigate('Varieties')} />
         <Button
-          label="Настройки"
+          label={t('menu.settings')}
           variant="secondary"
           onPress={() => navigation.navigate('Settings')}
         />
@@ -111,70 +106,70 @@ export function SettingsScreen({
 
   const currentRoleLabel =
     state.activeRole === 'collector'
-      ? 'Сборщик данных'
+      ? t('role.collector')
       : state.activeRole === 'analyst'
-        ? 'Аналитик данных'
-        : 'Руководитель';
+        ? t('role.analyst')
+        : t('role.manager');
 
   const currentModeLabel =
     state.collectorMode === 'test'
-      ? 'Тестовый режим'
+      ? t('settings.testMode')
       : state.collectorMode === 'linked'
-        ? 'Привязан к QR'
-        : 'Не настроено';
+        ? t('settings.linkedMode')
+        : t('settings.notConfigured');
 
   const askSwitch = (role: 'collector' | 'analyst' | 'manager') => {
-    Alert.alert(
-      'Сменить тип аккаунта?',
-      'Локальные данные сборщика будут очищены перед переключением роли.',
-      [
-        { text: 'Отмена', style: 'cancel' },
-        {
-          text: 'Сменить',
-          style: 'destructive',
-          onPress: () => {
-            switchRole(role);
-            if (role === 'collector') {
-              navigation.reset({
-                index: 0,
-                routes: [{ name: 'QrScanner', params: { origin: 'settings' } }],
-              });
-            } else {
-              navigation.reset({
-                index: 0,
-                routes: [{ name: 'PlaceholderRole', params: { role } }],
-              });
-            }
-          },
+    Alert.alert(t('settings.switchRoleTitle'), t('settings.switchRoleDescription'), [
+      { text: t('common.cancel'), style: 'cancel' },
+      {
+        text: t('settings.confirmSwitch'),
+        style: 'destructive',
+        onPress: () => {
+          switchRole(role);
+          if (role === 'collector') {
+            navigation.reset({
+              index: 0,
+              routes: [{ name: 'QrScanner', params: { origin: 'settings' } }],
+            });
+          } else {
+            navigation.reset({
+              index: 0,
+              routes: [{ name: 'PlaceholderRole', params: { role } }],
+            });
+          }
         },
-      ],
-    );
+      },
+    ]);
   };
 
   return (
     <Screen>
-      <Title>Настройки</Title>
+      <Title>{t('settings.title')}</Title>
       <Card>
         <View style={uiStyles.stack12}>
-          <Text style={styles.label}>Текущий аккаунт: {currentRoleLabel}</Text>
-          <Text style={styles.label}>Режим сборщика: {currentModeLabel}</Text>
+          <Text style={styles.label}>
+            {t('settings.currentRole')}: {currentRoleLabel}
+          </Text>
+          <Text style={styles.label}>
+            {t('settings.currentMode')}: {currentModeLabel}
+          </Text>
         </View>
         <Button
-          label="Добавить или заменить QR-привязку"
+          label={t('settings.replaceQr')}
           onPress={() => navigation.navigate('QrScanner', { origin: 'settings' })}
         />
         <Button
-          label="Переключить на аналитика"
+          label={t('settings.switchToAnalyst')}
           variant="secondary"
           onPress={() => askSwitch('analyst')}
         />
         <Button
-          label="Переключить на руководителя"
+          label={t('settings.switchToManager')}
           variant="secondary"
           onPress={() => askSwitch('manager')}
         />
         <Button
-          label="Выбрать сборщика заново"
+          label={t('settings.switchToCollector')}
           variant="ghost"
           onPress={() => askSwitch('collector')}
         />

@@ -4,6 +4,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 
 import { LoadingBlock } from '../components/Ui';
 import { useApp } from '../context/AppContext';
+import { t } from '../i18n';
 import {
   FusariumInfectionsScreen,
   FusariumOverviewScreen,
@@ -27,7 +28,7 @@ export function AppNavigator() {
   const { hydrated, state } = useApp();
 
   if (!hydrated) {
-    return <LoadingBlock label="Загружаем локальное состояние приложения..." />;
+    return <LoadingBlock label={t('app.loadingState')} />;
   }
 
   const initialRouteName =

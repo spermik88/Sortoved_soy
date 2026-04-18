@@ -107,7 +107,13 @@ export function Field({
   );
 }
 
-export function StatPill({ label, tone = 'neutral' }: { label: string; tone?: 'neutral' | 'success' | 'warning' }) {
+export function StatPill({
+  label,
+  tone = 'neutral',
+}: {
+  label: string;
+  tone?: 'neutral' | 'success' | 'warning';
+}) {
   return (
     <View
       style={[
@@ -154,9 +160,43 @@ export function LinkText({ label, url }: { label: string; url?: string }) {
 
 export function LoadingBlock({ label }: { label: string }) {
   return (
-    <View style={styles.loadingWrap}>
-      <ActivityIndicator size="large" color={colors.accentStrong} />
-      <Text style={styles.subtitle}>{label}</Text>
+    <SafeAreaView style={styles.safeArea}>
+      <View style={styles.loadingWrap}>
+        <ActivityIndicator size="large" color={colors.accentStrong} />
+        <Text style={styles.subtitle}>{label}</Text>
+      </View>
+    </SafeAreaView>
+  );
+}
+
+export function EmptyState({
+  title,
+  description,
+}: {
+  title: string;
+  description?: string;
+}) {
+  return (
+    <View style={styles.emptyWrap}>
+      <Text style={styles.emptyTitle}>{title}</Text>
+      {description ? <Text style={styles.placeholderText}>{description}</Text> : null}
+    </View>
+  );
+}
+
+export function StepIndicator({
+  current,
+  total,
+}: {
+  current: number;
+  total: number;
+}) {
+  return (
+    <View style={styles.stepWrap}>
+      {Array.from({ length: total }).map((_, index) => {
+        const active = index + 1 <= current;
+        return <View key={index} style={[styles.stepDot, active && styles.stepDotActive]} />;
+      })}
     </View>
   );
 }
@@ -325,5 +365,28 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 16,
     padding: 24,
+  },
+  emptyWrap: {
+    paddingVertical: 10,
+    gap: 6,
+  },
+  emptyTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: colors.text,
+    textAlign: 'center',
+  },
+  stepWrap: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  stepDot: {
+    flex: 1,
+    height: 6,
+    borderRadius: 999,
+    backgroundColor: colors.disabled,
+  },
+  stepDotActive: {
+    backgroundColor: colors.accentStrong,
   },
 });

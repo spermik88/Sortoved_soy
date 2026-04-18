@@ -9,21 +9,28 @@ import React, {
 } from 'react';
 
 import { collectorRepository } from '../repositories/collectorRepository';
+import { t } from '../i18n';
 import { mockSyncAdapter } from '../services/mockSyncAdapter';
 import { isInternetReachable, subscribeToNetwork } from '../services/networkService';
 import { qrResolver } from '../services/qrResolver';
 import {
   AccountRole,
-  CollectorMode,
   FusariumDraft,
   FusariumPlotDraft,
   InfectionCard,
   PersistedAppState,
   SyncTask,
-  TraitState,
+  SyncTaskStatus,
   VarietyLink,
 } from '../types/app';
 import { createId } from '../utils/id';
+import {
+  computeTraitState,
+  getCompletedPlotsCount as countCompletedPlots,
+  getLatestPlotStatus,
+  getOrCreatePlotDraft,
+  isInfectionCardComplete,
+} from './appStateUtils';
 
 const initialState: PersistedAppState = {
   activeRole: null,
@@ -77,43 +84,9 @@ function ensureTestVariety(state: PersistedAppState): PersistedAppState {
   };
 }
 
-function getOrCreatePlotDraft(
-  draft: FusariumDraft | undefined,
-  varietyId: string,
-  plotIndex: number,
-): FusariumPlotDraft {
-  return (
-    draft?.plots[String(plotIndex)] || {
-      plotIndex,
-      infections: [],
-      syncStatus: 'idle',
-    }
-  );
-}
+function updateVarietyTraitStatus(state: PersistedAppState, varietyId: string) {
+  const traitState = computeTraitState(state.fusariumDrafts[varietyId]);
 
-function isInfectionCardComplete(card: InfectionCard) {
-  return Boolean(card.photoUri && card.plantNumber.trim() && card.rowNumber.trim());
-}
-
-function computeTraitState(draft: FusariumDraft | undefined): TraitState {
-  if (!draft) {
-    return 'not_started';
-  }
-
-  const plots = Object.values(draft.plots);
-
-  if (plots.length >= 3 && plots.every((plot) => plot.syncStatus === 'synced')) {
-    return 'completed';
-  }
-
-  return 'in_progress';
-}
-
-function updateVarietyTraitStatus(
-  state: PersistedAppState,
-  varietyId: string,
-  traitState: TraitState,
-) {
   return {
     ...state,
     varieties: state.varieties.map((variety) =>
@@ -147,9 +120,14 @@ interface AppContextValue {
     cardId: string,
     changes: Partial<InfectionCard>,
   ) => void;
+  removeInfectionCard: (varietyId: string, plotIndex: number, cardId: string) => void;
   confirmFusariumPlot: (varietyId: string, plotIndex: number) => Promise<'synced' | 'queued'>;
   getFusariumPlotDraft: (varietyId: string, plotIndex: number) => FusariumPlotDraft;
   getNextFusariumPlot: (varietyId: string) => number;
+  getCompletedPlotsCount: (varietyId: string) => number;
+  getLatestVarietySyncStatus: (
+    varietyId: string,
+  ) => FusariumPlotDraft['syncStatus'] | SyncTaskStatus | 'idle';
 }
 
 const AppContext = createContext<AppContextValue | undefined>(undefined);
@@ -180,39 +158,81 @@ export function AppProvider({ children }: { children: ReactNode }) {
       return;
     }
 
-    collectorRepository.save(state);
+    void collectorRepository.save(state);
   }, [hydrated, state]);
 
   async function processTask(taskId: string): Promise<'synced' | 'queued'> {
+    const taskSnapshot = stateRef.current.syncQueue.find((task) => task.id === taskId);
+    const now = new Date().toISOString();
     const isOnline = await isInternetReachable();
 
+    if (!taskSnapshot) {
+      return 'queued';
+    }
+
     if (!isOnline) {
-      setState((current) => ({
+      setState((current) => {
+        const nextState = {
+          ...current,
+          fusariumDrafts: {
+            ...current.fusariumDrafts,
+            [taskSnapshot.varietyId]: {
+              ...current.fusariumDrafts[taskSnapshot.varietyId],
+              plots: {
+                ...current.fusariumDrafts[taskSnapshot.varietyId].plots,
+                [String(taskSnapshot.plotIndex)]: {
+                  ...current.fusariumDrafts[taskSnapshot.varietyId].plots[
+                    String(taskSnapshot.plotIndex)
+                  ],
+                  syncStatus: 'queued' as const,
+                  lastQueuedAt: now,
+                },
+              },
+              lastUpdated: now,
+            },
+          },
+          syncQueue: current.syncQueue.map((task) =>
+            task.id === taskId
+              ? { ...task, status: 'waiting_for_network' as const, updatedAt: now }
+              : task,
+          ),
+        };
+
+        return updateVarietyTraitStatus(nextState, taskSnapshot.varietyId);
+      });
+      return 'queued';
+    }
+
+    setState((current) => {
+      const nextState = {
         ...current,
+        fusariumDrafts: {
+          ...current.fusariumDrafts,
+          [taskSnapshot.varietyId]: {
+            ...current.fusariumDrafts[taskSnapshot.varietyId],
+            plots: {
+              ...current.fusariumDrafts[taskSnapshot.varietyId].plots,
+              [String(taskSnapshot.plotIndex)]: {
+                ...current.fusariumDrafts[taskSnapshot.varietyId].plots[
+                  String(taskSnapshot.plotIndex)
+                ],
+                syncStatus: 'syncing' as const,
+              },
+            },
+            lastUpdated: now,
+          },
+        },
         syncQueue: current.syncQueue.map((task) =>
           task.id === taskId
-            ? { ...task, status: 'waiting_for_network', updatedAt: new Date().toISOString() }
+            ? { ...task, status: 'processing' as const, updatedAt: now }
             : task,
         ),
-      }));
-      return 'queued';
-    }
+      };
 
-    setState((current) => ({
-      ...current,
-      syncQueue: current.syncQueue.map((task) =>
-        task.id === taskId
-          ? { ...task, status: 'processing', updatedAt: new Date().toISOString() }
-          : task,
-      ),
-    }));
+      return updateVarietyTraitStatus(nextState, taskSnapshot.varietyId);
+    });
 
-    const snapshot = stateRef.current.syncQueue.find((task) => task.id === taskId);
-    if (!snapshot) {
-      return 'queued';
-    }
-
-    await mockSyncAdapter.process(snapshot);
+    await mockSyncAdapter.process(taskSnapshot);
 
     setState((current) => {
       const completedTask = current.syncQueue.find((task) => task.id === taskId);
@@ -221,41 +241,37 @@ export function AppProvider({ children }: { children: ReactNode }) {
         return current;
       }
 
-      const updatedDrafts: Record<string, FusariumDraft> = {
-        ...current.fusariumDrafts,
-        [completedTask.varietyId]: {
-          ...current.fusariumDrafts[completedTask.varietyId],
-          plots: {
-            ...current.fusariumDrafts[completedTask.varietyId].plots,
-            [String(completedTask.plotIndex)]: {
-              ...current.fusariumDrafts[completedTask.varietyId].plots[String(completedTask.plotIndex)],
-              syncStatus: 'synced' as const,
+      const nextState = {
+        ...current,
+        fusariumDrafts: {
+          ...current.fusariumDrafts,
+          [completedTask.varietyId]: {
+            ...current.fusariumDrafts[completedTask.varietyId],
+            plots: {
+              ...current.fusariumDrafts[completedTask.varietyId].plots,
+              [String(completedTask.plotIndex)]: {
+                ...current.fusariumDrafts[completedTask.varietyId].plots[
+                  String(completedTask.plotIndex)
+                ],
+                syncStatus: 'synced' as const,
+                lastSyncAt: new Date().toISOString(),
+              },
             },
+            lastUpdated: new Date().toISOString(),
           },
-          lastUpdated: new Date().toISOString(),
         },
-      };
-
-      const traitState = computeTraitState(updatedDrafts[completedTask.varietyId]);
-      const nextState = updateVarietyTraitStatus(
-        {
-          ...current,
-          fusariumDrafts: updatedDrafts,
-          syncQueue: current.syncQueue.filter((task) => task.id !== taskId),
-          syncHistory: [
+        syncQueue: current.syncQueue.filter((task) => task.id !== taskId),
+        syncHistory: [
             {
               ...completedTask,
-              status: 'success',
+              status: 'success' as const,
               updatedAt: new Date().toISOString(),
             },
-            ...current.syncHistory,
-          ],
-        },
-        completedTask.varietyId,
-        traitState,
-      );
+          ...current.syncHistory,
+        ],
+      };
 
-      return nextState;
+      return updateVarietyTraitStatus(nextState, completedTask.varietyId);
     });
 
     return 'synced';
@@ -298,11 +314,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
         }));
       },
       switchRole(role) {
-        setState((current) => ({
+        setState({
           ...initialState,
           activeRole: role,
           firstLaunchCompleted: true,
-        }));
+        });
       },
       enableTestMode() {
         setState((current) =>
@@ -343,8 +359,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         } catch (error) {
           return {
             duplicate: false,
-            invalid:
-              error instanceof Error ? error.message : 'Не удалось обработать QR-код.',
+            invalid: error instanceof Error ? error.message : t('qr.invalidGeneric'),
           };
         }
       },
@@ -359,7 +374,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
             collectorMode: 'linked',
             pendingVariety: null,
             varieties: [
-              ...current.varieties.filter((variety) => variety.id !== 'test-variety'),
+              ...current.varieties.filter(
+                (variety) =>
+                  variety.id !== 'test-variety' &&
+                  variety.sheetUrl !== current.pendingVariety?.sheetUrl,
+              ),
               {
                 id: current.pendingVariety.id,
                 sheetUrl: current.pendingVariety.sheetUrl,
@@ -383,36 +402,32 @@ export function AppProvider({ children }: { children: ReactNode }) {
       saveOverviewPhoto(varietyId, plotIndex, uri) {
         setState((current) => {
           const draft = current.fusariumDrafts[varietyId];
-          const plotDraft = getOrCreatePlotDraft(draft, varietyId, plotIndex);
-          const nextDraft: FusariumDraft = {
-            varietyId,
-            lastUpdated: new Date().toISOString(),
-            plots: {
-              ...draft?.plots,
-              [String(plotIndex)]: {
-                ...plotDraft,
-                overviewPhoto: uri,
+          const plotDraft = getOrCreatePlotDraft(draft, plotIndex);
+          const nextState = {
+            ...current,
+            fusariumDrafts: {
+              ...current.fusariumDrafts,
+              [varietyId]: {
+                varietyId,
+                lastUpdated: new Date().toISOString(),
+                plots: {
+                  ...draft?.plots,
+                  [String(plotIndex)]: {
+                    ...plotDraft,
+                    overviewPhoto: uri,
+                  },
+                },
               },
             },
           };
 
-          return updateVarietyTraitStatus(
-            {
-              ...current,
-              fusariumDrafts: {
-                ...current.fusariumDrafts,
-                [varietyId]: nextDraft,
-              },
-            },
-            varietyId,
-            'in_progress',
-          );
+          return updateVarietyTraitStatus(nextState, varietyId);
         });
       },
       addInfectionCard(varietyId, plotIndex) {
         setState((current) => {
           const draft = current.fusariumDrafts[varietyId];
-          const plotDraft = getOrCreatePlotDraft(draft, varietyId, plotIndex);
+          const plotDraft = getOrCreatePlotDraft(draft, plotIndex);
           const card: InfectionCard = {
             id: createId('infection'),
             plantNumber: '',
@@ -420,7 +435,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
             isComplete: false,
           };
 
-          return {
+          const nextState = {
             ...current,
             fusariumDrafts: {
               ...current.fusariumDrafts,
@@ -437,14 +452,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
               },
             },
           };
+
+          return updateVarietyTraitStatus(nextState, varietyId);
         });
       },
       updateInfectionCard(varietyId, plotIndex, cardId, changes) {
         setState((current) => {
           const draft = current.fusariumDrafts[varietyId];
-          const plotDraft = getOrCreatePlotDraft(draft, varietyId, plotIndex);
+          const plotDraft = getOrCreatePlotDraft(draft, plotIndex);
 
-          return {
+          const nextState = {
             ...current,
             fusariumDrafts: {
               ...current.fusariumDrafts,
@@ -475,11 +492,38 @@ export function AppProvider({ children }: { children: ReactNode }) {
               },
             },
           };
+
+          return updateVarietyTraitStatus(nextState, varietyId);
+        });
+      },
+      removeInfectionCard(varietyId, plotIndex, cardId) {
+        setState((current) => {
+          const draft = current.fusariumDrafts[varietyId];
+          const plotDraft = getOrCreatePlotDraft(draft, plotIndex);
+          const nextState = {
+            ...current,
+            fusariumDrafts: {
+              ...current.fusariumDrafts,
+              [varietyId]: {
+                varietyId,
+                lastUpdated: new Date().toISOString(),
+                plots: {
+                  ...draft?.plots,
+                  [String(plotIndex)]: {
+                    ...plotDraft,
+                    infections: plotDraft.infections.filter((card) => card.id !== cardId),
+                  },
+                },
+              },
+            },
+          };
+
+          return updateVarietyTraitStatus(nextState, varietyId);
         });
       },
       async confirmFusariumPlot(varietyId, plotIndex) {
         const draft = stateRef.current.fusariumDrafts[varietyId];
-        const plotDraft = getOrCreatePlotDraft(draft, varietyId, plotIndex);
+        const plotDraft = getOrCreatePlotDraft(draft, plotIndex);
         const taskId = createId('sync');
         const now = new Date().toISOString();
         const task: SyncTask = {
@@ -490,6 +534,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
           payload: {
             ...plotDraft,
             syncStatus: 'queued',
+            lastQueuedAt: now,
           },
           status: 'queued',
           retryCount: 0,
@@ -497,28 +542,33 @@ export function AppProvider({ children }: { children: ReactNode }) {
           updatedAt: now,
         };
 
-        setState((current) => ({
-          ...current,
-          fusariumDrafts: {
-            ...current.fusariumDrafts,
-            [varietyId]: {
-              ...current.fusariumDrafts[varietyId],
-              plots: {
-                ...current.fusariumDrafts[varietyId].plots,
-                [String(plotIndex)]: {
-                  ...current.fusariumDrafts[varietyId].plots[String(plotIndex)],
-                  syncStatus: 'queued',
+        setState((current) => {
+          const nextState = {
+            ...current,
+            fusariumDrafts: {
+              ...current.fusariumDrafts,
+              [varietyId]: {
+                ...current.fusariumDrafts[varietyId],
+                plots: {
+                  ...current.fusariumDrafts[varietyId].plots,
+                  [String(plotIndex)]: {
+                    ...current.fusariumDrafts[varietyId].plots[String(plotIndex)],
+                    syncStatus: 'queued' as const,
+                    lastQueuedAt: now,
+                  },
                 },
               },
             },
-          },
-          syncQueue: [task, ...current.syncQueue],
-        }));
+            syncQueue: [task, ...current.syncQueue],
+          };
+
+          return updateVarietyTraitStatus(nextState, varietyId);
+        });
 
         return processTask(taskId);
       },
       getFusariumPlotDraft(varietyId, plotIndex) {
-        return getOrCreatePlotDraft(state.fusariumDrafts[varietyId], varietyId, plotIndex);
+        return getOrCreatePlotDraft(state.fusariumDrafts[varietyId], plotIndex);
       },
       getNextFusariumPlot(varietyId) {
         const plots = state.fusariumDrafts[varietyId]?.plots || {};
@@ -530,6 +580,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
         }
 
         return 1;
+      },
+      getCompletedPlotsCount(varietyId) {
+        return countCompletedPlots(state.fusariumDrafts[varietyId]);
+      },
+      getLatestVarietySyncStatus(varietyId) {
+        return getLatestPlotStatus(state.fusariumDrafts[varietyId]);
       },
     }),
     [hydrated, state],

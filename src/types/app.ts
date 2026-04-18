@@ -29,6 +29,8 @@ export interface FusariumPlotDraft {
   overviewPhoto?: string;
   infections: InfectionCard[];
   syncStatus: 'idle' | 'queued' | 'syncing' | 'synced' | 'failed';
+  lastSyncAt?: string;
+  lastQueuedAt?: string;
 }
 
 export interface FusariumDraft {

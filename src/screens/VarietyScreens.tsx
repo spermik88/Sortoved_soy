@@ -6,7 +6,9 @@ import { Button, Card, Screen, StatPill, Title } from '../components/Ui';
 import { TRAITS } from '../constants/traits';
 import { colors } from '../constants/theme';
 import { useApp } from '../context/AppContext';
+import { t } from '../i18n';
 import { RootStackParamList } from '../navigation/types';
+import { getSyncStatusText } from '../utils/syncStatus';
 
 export function VarietiesScreen({
   navigation,
@@ -18,8 +20,8 @@ export function VarietiesScreen({
 
   return (
     <Screen>
-      <Title subtitle={state.collectorMode === 'test' ? 'Тестовый режим' : undefined}>
-        Сорта
+      <Title subtitle={state.collectorMode === 'test' ? t('menu.testMode') : undefined}>
+        {t('varieties.title')}
       </Title>
       <Card>
         {varieties.length ? (
@@ -31,11 +33,11 @@ export function VarietiesScreen({
             />
           ))
         ) : (
-          <Text style={styles.emptyText}>Список сортов пока пуст.</Text>
+          <Text style={styles.emptyText}>{t('varieties.empty')}</Text>
         )}
 
         <Button
-          label="Добавить сорт"
+          label={t('varieties.add')}
           variant="secondary"
           onPress={() => navigation.navigate('QrScanner', { origin: 'varieties' })}
         />
@@ -48,12 +50,20 @@ export function VarietyDetailScreen({
   navigation,
   route,
 }: NativeStackScreenProps<RootStackParamList, 'VarietyDetail'>) {
-  const { state, getNextFusariumPlot } = useApp();
+  const {
+    state,
+    getCompletedPlotsCount,
+    getLatestVarietySyncStatus,
+    getNextFusariumPlot,
+  } = useApp();
   const variety = state.varieties.find((item) => item.id === route.params.varietyId);
 
   if (!variety) {
     return null;
   }
+
+  const completedPlots = getCompletedPlotsCount(variety.id);
+  const latestStatus = getLatestVarietySyncStatus(variety.id);
 
   return (
     <Screen>
@@ -62,10 +72,10 @@ export function VarietyDetailScreen({
         <StatPill
           label={
             variety.traitStatuses.fusarium === 'completed'
-              ? 'Фузариоз завершен'
+              ? t('varieties.fusariumDone')
               : variety.traitStatuses.fusarium === 'in_progress'
-                ? 'Фузариоз в работе'
-                : 'Фузариоз не начат'
+                ? t('varieties.fusariumProgress')
+                : t('varieties.fusariumNotStarted')
           }
           tone={
             variety.traitStatuses.fusarium === 'completed'
@@ -75,6 +85,10 @@ export function VarietyDetailScreen({
                 : 'neutral'
           }
         />
+        <Text style={styles.metaText}>
+          {t('varieties.syncedPlots')}: {completedPlots}/3
+        </Text>
+        <Text style={styles.metaText}>{getSyncStatusText(latestStatus)}</Text>
 
         {TRAITS.map((trait, index) => {
           const isFusarium = index === 0;
@@ -92,11 +106,11 @@ export function VarietyDetailScreen({
               }
               style={[styles.traitRow, !isFusarium && styles.traitRowDisabled]}
             >
-              <Text style={styles.checkbox}>{completed ? '✓' : '○'}</Text>
+              <Text style={styles.checkbox}>{completed ? '[x]' : '[ ]'}</Text>
               <View style={styles.traitTextWrap}>
                 <Text style={styles.traitText}>{trait}</Text>
                 {!isFusarium ? (
-                  <Text style={styles.traitCaption}>Будет реализовано позже</Text>
+                  <Text style={styles.traitCaption}>{t('varieties.readyLater')}</Text>
                 ) : null}
               </View>
             </Pressable>
@@ -113,6 +127,10 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: colors.textMuted,
   },
+  metaText: {
+    fontSize: 14,
+    color: colors.textMuted,
+  },
   traitRow: {
     flexDirection: 'row',
     gap: 12,
@@ -125,7 +143,7 @@ const styles = StyleSheet.create({
     opacity: 0.55,
   },
   checkbox: {
-    fontSize: 20,
+    fontSize: 18,
     color: colors.accentStrong,
     marginTop: 1,
   },
