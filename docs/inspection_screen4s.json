@@ -1,0 +1,2463 @@
+﻿{
+  "meta": {
+    "formatVersion": 1,
+    "projectName": "Сортовед Соя",
+    "source": "codex",
+    "createdAt": "2026-04-20T08:00:00.000Z",
+    "updatedAt": "2026-04-21T14:20:51.831Z"
+  },
+  "board": {
+    "zoom": 0.9,
+    "pan": {
+      "x": -1817.957169015067,
+      "y": -1686.9717511858248
+    }
+  },
+  "screens": [
+    {
+      "id": "screen_ae434489",
+      "kind": "screen",
+      "name": "стартовый экран первый запуск",
+      "comment": "",
+      "position": {
+        "x": 1605,
+        "y": 579
+      },
+      "size": {
+        "width": 390,
+        "height": 844
+      },
+      "targetId": "",
+      "scrollEnabled": false,
+      "scrollOffset": 0,
+      "elements": [
+        {
+          "id": "button_d89d93f6",
+          "label": "добавить ссылку",
+          "comment": "ведет к oauth2, вставляет ссылку из буфера обмена. нужен валидатор ссылки. если в буфере пусто, или ссылка невалидна, или ошибка -  toast notification на 2 сек.",
+          "fontSize": 10,
+          "frame": {
+            "x": 102,
+            "y": 211,
+            "width": 144,
+            "height": 74
+          },
+          "type": "button",
+          "targetId": "action_e3db4a91"
+        },
+        {
+          "id": "button_3e5c09bd",
+          "label": "создать сорт",
+          "comment": "ведет к oauth2. нужно войти в гугл аккаунт что бы можно было создавать таблицы в гугл табс от имени программы по шаблону.",
+          "fontSize": 10,
+          "frame": {
+            "x": 102,
+            "y": 446,
+            "width": 144,
+            "height": 61
+          },
+          "type": "button",
+          "targetId": "screen_84c83be0"
+        },
+        {
+          "id": "button_12c139ef",
+          "label": "список сортов",
+          "comment": "неактивна, если не добавлен или не создан сорт.",
+          "fontSize": 10,
+          "frame": {
+            "x": 102,
+            "y": 627,
+            "width": 144,
+            "height": 61
+          },
+          "type": "button",
+          "targetId": "screen_f543bcff"
+        },
+        {
+          "id": "text_970ea144",
+          "label": "Подсказка: вставьте ссылку на гугл табс. вы можете  присоедениться к уже существующему сорту.  вам будет доступна вся история  работы с ним. вы будете  участником  таблицы.",
+          "comment": "",
+          "fontSize": 10,
+          "frame": {
+            "x": 102,
+            "y": 303,
+            "width": 153,
+            "height": 116
+          },
+          "type": "text"
+        },
+        {
+          "id": "text_59eba9e9",
+          "label": "подсказка: вы можете создать новый  сорт с чистого листа. вы будете  создателем таблицы.",
+          "comment": "",
+          "fontSize": 10,
+          "frame": {
+            "x": 102,
+            "y": 521,
+            "width": 140,
+            "height": 76
+          },
+          "type": "text"
+        },
+        {
+          "id": "text_9d688486",
+          "label": "зайдите в гугл аккаунт, что бы вы могли создавать сорт или работать с чьим-то созданным. Вы сможете видеть данные в гугл табс",
+          "comment": "",
+          "fontSize": 10,
+          "frame": {
+            "x": 102,
+            "y": 88,
+            "width": 140,
+            "height": 98
+          },
+          "type": "text"
+        }
+      ]
+    },
+    {
+      "id": "screen_84c83be0",
+      "kind": "screen",
+      "name": "логин в гугл аккаунт",
+      "comment": "при успешном логине и валидной ссылке на гугл-табс добавляет ссылку таблицы в экран создание сорта.название.",
+      "position": {
+        "x": 1962,
+        "y": 751
+      },
+      "size": {
+        "width": 390,
+        "height": 844
+      },
+      "targetId": "screen_64e52250",
+      "scrollEnabled": false,
+      "scrollOffset": 0,
+      "elements": []
+    },
+    {
+      "id": "screen_f543bcff",
+      "kind": "screen",
+      "name": "список сортов",
+      "comment": "список всех добавленны/созднных гугл таблиц. ",
+      "position": {
+        "x": 1146,
+        "y": 613
+      },
+      "size": {
+        "width": 390,
+        "height": 844
+      },
+      "targetId": "",
+      "scrollEnabled": true,
+      "scrollOffset": 0,
+      "elements": [
+        {
+          "id": "button_4a158dcc",
+          "label": "сорт 1 тест",
+          "comment": "добавленный пользователем  ссылка на гугл-таблицу. имя кнопки - название гугл-таблицы.ведет на экран сорта.",
+          "fontSize": 15,
+          "frame": {
+            "x": 68,
+            "y": 272,
+            "width": 173,
+            "height": 87
+          },
+          "type": "button",
+          "targetId": "screen_62b796d2"
+        },
+        {
+          "id": "button_62168683",
+          "label": "сорт 2 тест",
+          "comment": "",
+          "fontSize": 15,
+          "frame": {
+            "x": 68,
+            "y": 369,
+            "width": 173,
+            "height": 87
+          },
+          "type": "button",
+          "targetId": ""
+        },
+        {
+          "id": "text_4f52147c",
+          "label": "список сортов ",
+          "comment": "",
+          "fontSize": 10,
+          "frame": {
+            "x": 68,
+            "y": 88,
+            "width": 140,
+            "height": 40
+          },
+          "type": "text"
+        },
+        {
+          "id": "button_2dfc20cd",
+          "label": "добавить сорт",
+          "comment": "",
+          "fontSize": 15,
+          "frame": {
+            "x": 52,
+            "y": 153,
+            "width": 173,
+            "height": 87
+          },
+          "type": "button",
+          "targetId": ""
+        }
+      ]
+    },
+    {
+      "id": "screen_e2c06dae",
+      "kind": "screen",
+      "name": "логин в гугл аккаунт",
+      "comment": "при успешном логине и валидной ссылке на гугл-табс добавляет ссылку таблицы в экран список сортов.",
+      "position": {
+        "x": 1595,
+        "y": -70
+      },
+      "size": {
+        "width": 390,
+        "height": 844
+      },
+      "targetId": "screen_f543bcff",
+      "scrollEnabled": false,
+      "scrollOffset": 0,
+      "elements": []
+    },
+    {
+      "id": "screen_64e52250",
+      "kind": "screen",
+      "name": "создание сорта.название.",
+      "comment": "шаги по созданию сорта: копирует таблицу-образец, лежащий внутри приложения, и начинает подставлять данные в ячейки в зависимости от шага, ссылка на шаблон и ячейку такого вида: путь до файла\\шаблон_таблицы_создание.xlsx\\название листа\\столбец\\строка; например:src\\шаблон_таблицы_создание.xlsx\\делянки\\расстояние между растениями\\делянка 1. в случае создания нового сорта(новой таблицы по шаблону) скопированный шаблон таблицы(новый сорт) называется так, как пользователь написал в экране создание сорта.название, и с этим же названием и содержимым, форматом таблицы загружает в гугл.таблицы по окончанию шагов создания сорта. в дальнейшем все созданные сорта появляются не только в гугл таблице пользователя, но и в приложении в экране \"список сортов\".",
+      "position": {
+        "x": 2365,
+        "y": 723
+      },
+      "size": {
+        "width": 390,
+        "height": 844
+      },
+      "targetId": "",
+      "scrollEnabled": false,
+      "scrollOffset": 0,
+      "elements": [
+        {
+          "id": "block_1e8fed50",
+          "label": "введите название сорта.",
+          "comment": "блок для ввода текста. текст который тут будет вписан - будет называться гугл-таблица, создаваемая в шаге создания.",
+          "fontSize": 14,
+          "frame": {
+            "x": 56,
+            "y": 113,
+            "width": 278,
+            "height": 190
+          },
+          "type": "block"
+        },
+        {
+          "id": "button_4fa7a99b",
+          "label": "далее",
+          "comment": "неактивна, пока не введут текст.",
+          "fontSize": 15,
+          "frame": {
+            "x": 109,
+            "y": 581,
+            "width": 173,
+            "height": 68
+          },
+          "type": "button",
+          "targetId": "screen_73100733"
+        },
+        {
+          "id": "button_f0e31df5",
+          "label": "назад",
+          "comment": "",
+          "fontSize": 15,
+          "frame": {
+            "x": 109,
+            "y": 692,
+            "width": 173,
+            "height": 68
+          },
+          "type": "button",
+          "targetId": "screen_ae434489"
+        }
+      ]
+    },
+    {
+      "id": "screen_73100733",
+      "kind": "screen",
+      "name": "создание сорта. дата.",
+      "comment": "",
+      "position": {
+        "x": 2725,
+        "y": 715
+      },
+      "size": {
+        "width": 390,
+        "height": 844
+      },
+      "targetId": "",
+      "scrollEnabled": false,
+      "scrollOffset": 0,
+      "elements": [
+        {
+          "id": "block_8fa382b1",
+          "label": "укажите дату создания делянки",
+          "comment": "интерактивный блок открывает календарь, ждет указания даты. есть кнопка \"сегодняшняя дата\". дата указывается в ячейке src\\шаблон_таблицы_создание.xlsx\\делянки\\дата создания\\делянка 1.",
+          "fontSize": 14,
+          "frame": {
+            "x": 65,
+            "y": 88,
+            "width": 260,
+            "height": 248
+          },
+          "type": "block"
+        },
+        {
+          "id": "block_b0f98c92",
+          "label": "укажите дату посева",
+          "comment": "интерактивный блок; открывает календарь, ждет указания даты. есть кнопка \"сегодняшняя дата\". после указания дата сохраняеются в ячейке в ячейке src\\шаблон_таблицы_создание.xlsx\\делянки\\дата посева\\делянка 1.",
+          "fontSize": 14,
+          "frame": {
+            "x": 65,
+            "y": 366,
+            "width": 252,
+            "height": 182
+          },
+          "type": "block"
+        },
+        {
+          "id": "button_ca9babbd",
+          "label": "далее",
+          "comment": "активна, независимо от ввода данных на этом экране. если пользователь не указывает данные - вписывает сегодняшнюю дату в обе ячейки.",
+          "fontSize": 15,
+          "frame": {
+            "x": 105,
+            "y": 573,
+            "width": 173,
+            "height": 68
+          },
+          "type": "button",
+          "targetId": "screen_3c6fdf96"
+        },
+        {
+          "id": "button_bb12efc1",
+          "label": "назад",
+          "comment": "",
+          "fontSize": 15,
+          "frame": {
+            "x": 105,
+            "y": 665,
+            "width": 173,
+            "height": 68
+          },
+          "type": "button",
+          "targetId": "screen_64e52250"
+        }
+      ]
+    },
+    {
+      "id": "screen_3c6fdf96",
+      "kind": "screen",
+      "name": "создание сорта. местоположение.",
+      "comment": "",
+      "position": {
+        "x": 3017,
+        "y": 714
+      },
+      "size": {
+        "width": 390,
+        "height": 844
+      },
+      "targetId": "",
+      "scrollEnabled": false,
+      "scrollOffset": 0,
+      "elements": [
+        {
+          "id": "block_1a5c573a",
+          "label": "укажите местоположение делянок.",
+          "comment": "при нажатии открывает карту, пользователь указывает точку на карте;  в ячейках src\\шаблон_таблицы_создание.xlsx\\делянки\\ширина\\делянка 1,делянка 2, делянка 3 сохраняется ширина указанной точки, в ячейке src\\шаблон_таблицы_создание.xlsx\\делянки\\долгота\\делянка 1, делянка 2, делянка 3 сохраняется долгота указанной точки.\nв ячейке src\\шаблон_таблицы_создание.xlsx\\делянки\\ссылка гугл.мапс\\делянка 1, делянка 2, делянка 3  создается ссылка на точку на карте в гугл.мапс.",
+          "fontSize": 14,
+          "frame": {
+            "x": 37,
+            "y": 97,
+            "width": 317,
+            "height": 169
+          },
+          "type": "block"
+        },
+        {
+          "id": "button_d2cd0892",
+          "label": "далее",
+          "comment": "неактивна, пока не установить геопозицию.",
+          "fontSize": 15,
+          "frame": {
+            "x": 109,
+            "y": 564,
+            "width": 173,
+            "height": 68
+          },
+          "type": "button",
+          "targetId": "screen_951193b7"
+        },
+        {
+          "id": "button_3a080137",
+          "label": "Назад",
+          "comment": "",
+          "fontSize": 15,
+          "frame": {
+            "x": 109,
+            "y": 660,
+            "width": 173,
+            "height": 68
+          },
+          "type": "button",
+          "targetId": "screen_73100733"
+        }
+      ]
+    },
+    {
+      "id": "screen_951193b7",
+      "kind": "screen",
+      "name": "создание сорта. делянка 1. площадь.",
+      "comment": "",
+      "position": {
+        "x": 3304,
+        "y": 716
+      },
+      "size": {
+        "width": 390,
+        "height": 844
+      },
+      "targetId": "",
+      "scrollEnabled": false,
+      "scrollOffset": 0,
+      "elements": [
+        {
+          "id": "text_af18dcea",
+          "label": "подтвердите, что площадь делянки 1  5 кв.м",
+          "comment": "",
+          "fontSize": 18,
+          "frame": {
+            "x": 94,
+            "y": 106,
+            "width": 145,
+            "height": 95
+          },
+          "type": "text"
+        },
+        {
+          "id": "button_35152deb",
+          "label": "подтверждаю",
+          "comment": "после нажатия подтверждаю устанавливается значение \"да\" в ячейке src\\шаблон_таблицы_создание.xlsx\\делянки\\площадь делянки\\делянка 1.",
+          "fontSize": 11,
+          "frame": {
+            "x": 117,
+            "y": 556,
+            "width": 157,
+            "height": 63
+          },
+          "type": "button",
+          "targetId": "screen_8caf316b"
+        },
+        {
+          "id": "button_f54cfae5",
+          "label": "Назад",
+          "comment": "",
+          "fontSize": 15,
+          "frame": {
+            "x": 109,
+            "y": 658,
+            "width": 173,
+            "height": 68
+          },
+          "type": "button",
+          "targetId": "screen_3c6fdf96"
+        }
+      ]
+    },
+    {
+      "id": "screen_8caf316b",
+      "kind": "screen",
+      "name": "создание сорта. делянка 1. расстояние межурядья.",
+      "comment": "",
+      "position": {
+        "x": 3606,
+        "y": 728
+      },
+      "size": {
+        "width": 390,
+        "height": 844
+      },
+      "targetId": "",
+      "scrollEnabled": false,
+      "scrollOffset": 0,
+      "elements": [
+        {
+          "id": "list_e4ea6c7d",
+          "label": "Список",
+          "comment": "radio buttons. выбор только одного значения. цифра выбранного значения указывается в создаваемой таблице в ячейке src\\шаблон_таблицы_создание.xlsx\\делянки\\расстояние межурядья\\делянка 1.",
+          "fontSize": 14,
+          "frame": {
+            "x": 71,
+            "y": 257,
+            "width": 250,
+            "height": 180
+          },
+          "type": "list",
+          "items": [
+            "15 см",
+            "45 см",
+            "70 см"
+          ]
+        },
+        {
+          "id": "text_d20cee85",
+          "label": "укажите расстояние  между рядами",
+          "comment": "",
+          "fontSize": 18,
+          "frame": {
+            "x": 125,
+            "y": 99,
+            "width": 140,
+            "height": 95
+          },
+          "type": "text"
+        },
+        {
+          "id": "button_3fd95868",
+          "label": "далее",
+          "comment": "пока не выбран одно из значений в списке, неактвана.",
+          "fontSize": 15,
+          "frame": {
+            "x": 109,
+            "y": 538,
+            "width": 173,
+            "height": 68
+          },
+          "type": "button",
+          "targetId": "screen_86d0a45c"
+        },
+        {
+          "id": "button_3fd02dd8",
+          "label": "Назад",
+          "comment": "",
+          "fontSize": 15,
+          "frame": {
+            "x": 109,
+            "y": 646,
+            "width": 173,
+            "height": 68
+          },
+          "type": "button",
+          "targetId": "screen_951193b7"
+        }
+      ]
+    },
+    {
+      "id": "screen_781b733c",
+      "kind": "screen",
+      "name": "создание сорта. делянка 1. расстояние между растениями.",
+      "comment": "",
+      "position": {
+        "x": 4284,
+        "y": 717
+      },
+      "size": {
+        "width": 390,
+        "height": 844
+      },
+      "targetId": "",
+      "scrollEnabled": false,
+      "scrollOffset": 0,
+      "elements": [
+        {
+          "id": "text_d325bf0c",
+          "label": "подтвердите, что расстояние между  расстояниями  на делянке 1 всегда 8-10см.",
+          "comment": "",
+          "fontSize": 18,
+          "frame": {
+            "x": 114,
+            "y": 102,
+            "width": 181,
+            "height": 143
+          },
+          "type": "text"
+        },
+        {
+          "id": "button_6931531b",
+          "label": "подтверждаю",
+          "comment": "нажатие кнопки устанавливает значение \"да\" в ячейке src\\шаблон_таблицы_создание.xlsx\\делянки\\расстояние между растениями\\делянка 1.",
+          "fontSize": 15,
+          "frame": {
+            "x": 105,
+            "y": 552,
+            "width": 182,
+            "height": 68
+          },
+          "type": "button",
+          "targetId": "screen_0efa24b2"
+        },
+        {
+          "id": "button_fd42a972",
+          "label": "назад",
+          "comment": "",
+          "fontSize": 15,
+          "frame": {
+            "x": 114,
+            "y": 668,
+            "width": 173,
+            "height": 68
+          },
+          "type": "button",
+          "targetId": "screen_86d0a45c"
+        }
+      ]
+    },
+    {
+      "id": "screen_0efa24b2",
+      "kind": "screen",
+      "name": "создание сорта. делянка 1.фото делянки.",
+      "comment": "",
+      "position": {
+        "x": 4648,
+        "y": 715
+      },
+      "size": {
+        "width": 390,
+        "height": 844
+      },
+      "targetId": "",
+      "scrollEnabled": false,
+      "scrollOffset": 0,
+      "elements": [
+        {
+          "id": "block_a0c30464",
+          "label": "сделайте фотографию делянки.",
+          "comment": "нажатие на блок открывает камеру. выбрать из галереи нельзя. есть превью фото, можно переснять. полученное фото загружается в ячейку в ячейке src\\шаблон_таблицы_создание.xlsx\\делянки\\первое фото делянки\\делянка 1.",
+          "fontSize": 14,
+          "frame": {
+            "x": 43,
+            "y": 120,
+            "width": 305,
+            "height": 184
+          },
+          "type": "block"
+        },
+        {
+          "id": "button_3d4de8de",
+          "label": "далее",
+          "comment": "неактивна, пока не сделают фото.",
+          "fontSize": 15,
+          "frame": {
+            "x": 109,
+            "y": 589,
+            "width": 173,
+            "height": 68
+          },
+          "type": "button",
+          "targetId": "screen_580db949"
+        },
+        {
+          "id": "button_13348d2b",
+          "label": "Назад",
+          "comment": "",
+          "fontSize": 15,
+          "frame": {
+            "x": 109,
+            "y": 688,
+            "width": 173,
+            "height": 68
+          },
+          "type": "button",
+          "targetId": "screen_781b733c"
+        }
+      ]
+    },
+    {
+      "id": "screen_580db949",
+      "kind": "screen",
+      "name": "создание сорта. делянка 2. площадь.",
+      "comment": "",
+      "position": {
+        "x": 4970,
+        "y": 723
+      },
+      "size": {
+        "width": 390,
+        "height": 844
+      },
+      "targetId": "",
+      "scrollEnabled": false,
+      "scrollOffset": 0,
+      "elements": [
+        {
+          "id": "text_5a599b9f",
+          "label": "подтвердите, что площадь делянки 1  5 кв.м",
+          "comment": "",
+          "fontSize": 18,
+          "frame": {
+            "x": 94,
+            "y": 106,
+            "width": 145,
+            "height": 95
+          },
+          "type": "text"
+        },
+        {
+          "id": "button_82f78c83",
+          "label": "подтверждаю",
+          "comment": "после нажатия подтверждаю устанавливается значение \"да\" в ячейке src\\шаблон_таблицы_создание.xlsx\\делянки\\площадь делянки\\делянка 2.",
+          "fontSize": 11,
+          "frame": {
+            "x": 117,
+            "y": 556,
+            "width": 157,
+            "height": 63
+          },
+          "type": "button",
+          "targetId": "screen_b4b9b986"
+        },
+        {
+          "id": "button_8a608858",
+          "label": "Назад",
+          "comment": "",
+          "fontSize": 15,
+          "frame": {
+            "x": 109,
+            "y": 658,
+            "width": 173,
+            "height": 68
+          },
+          "type": "button",
+          "targetId": "screen_0efa24b2"
+        }
+      ]
+    },
+    {
+      "id": "screen_b4b9b986",
+      "kind": "screen",
+      "name": "создание сорта. делянка 2. расстояние межурядья.",
+      "comment": "",
+      "position": {
+        "x": 5303,
+        "y": 726
+      },
+      "size": {
+        "width": 390,
+        "height": 844
+      },
+      "targetId": "",
+      "scrollEnabled": false,
+      "scrollOffset": 0,
+      "elements": [
+        {
+          "id": "list_0b08a630",
+          "label": "Список",
+          "comment": "radio buttons. выбор только одного значения. цифра выбранного значения указывается в создаваемой таблице в ячейке src\\шаблон_таблицы_создание.xlsx\\делянки\\расстояние межурядья\\делянка 2.",
+          "fontSize": 14,
+          "frame": {
+            "x": 71,
+            "y": 257,
+            "width": 250,
+            "height": 180
+          },
+          "type": "list",
+          "items": [
+            "15 см",
+            "45 см",
+            "70 см"
+          ]
+        },
+        {
+          "id": "text_c60650ca",
+          "label": "укажите расстояние  между рядами",
+          "comment": "",
+          "fontSize": 18,
+          "frame": {
+            "x": 125,
+            "y": 99,
+            "width": 140,
+            "height": 95
+          },
+          "type": "text"
+        },
+        {
+          "id": "button_87e8f0b9",
+          "label": "далее",
+          "comment": "пока не выбран одно из значений в списке, неактвана.",
+          "fontSize": 15,
+          "frame": {
+            "x": 109,
+            "y": 538,
+            "width": 173,
+            "height": 68
+          },
+          "type": "button",
+          "targetId": "screen_b9367a28"
+        },
+        {
+          "id": "button_c0405a12",
+          "label": "Назад",
+          "comment": "",
+          "fontSize": 15,
+          "frame": {
+            "x": 109,
+            "y": 646,
+            "width": 173,
+            "height": 68
+          },
+          "type": "button",
+          "targetId": "screen_580db949"
+        }
+      ]
+    },
+    {
+      "id": "screen_5eeb03fb",
+      "kind": "screen",
+      "name": "создание сорта. делянка 3. расстояние между растениями.",
+      "comment": "",
+      "position": {
+        "x": 7487,
+        "y": 712
+      },
+      "size": {
+        "width": 390,
+        "height": 844
+      },
+      "targetId": "",
+      "scrollEnabled": false,
+      "scrollOffset": 0,
+      "elements": [
+        {
+          "id": "text_7c36e406",
+          "label": "подтвердите, что расстояние между  расстояниями  на делянке 1 всегда 8-10см.",
+          "comment": "",
+          "fontSize": 18,
+          "frame": {
+            "x": 105,
+            "y": 88,
+            "width": 181,
+            "height": 143
+          },
+          "type": "text"
+        },
+        {
+          "id": "button_6ba906b7",
+          "label": "подтверждаю",
+          "comment": "нажатие кнопки устанавливает значение \"да\" в ячейке src\\шаблон_таблицы_создание.xlsx\\делянки\\расстояние между растениями\\делянка 3.",
+          "fontSize": 15,
+          "frame": {
+            "x": 105,
+            "y": 552,
+            "width": 182,
+            "height": 68
+          },
+          "type": "button",
+          "targetId": "screen_75b2fe72"
+        },
+        {
+          "id": "button_e98abcce",
+          "label": "назад",
+          "comment": "",
+          "fontSize": 15,
+          "frame": {
+            "x": 114,
+            "y": 668,
+            "width": 173,
+            "height": 68
+          },
+          "type": "button",
+          "targetId": "screen_0e24676f"
+        }
+      ]
+    },
+    {
+      "id": "screen_1f45d2c6",
+      "kind": "screen",
+      "name": "создание сорта. делянка 2.фото делянки.",
+      "comment": "",
+      "position": {
+        "x": 6191,
+        "y": 715
+      },
+      "size": {
+        "width": 390,
+        "height": 844
+      },
+      "targetId": "",
+      "scrollEnabled": false,
+      "scrollOffset": 0,
+      "elements": [
+        {
+          "id": "block_4796f0d3",
+          "label": "сделайте фотографию делянки.",
+          "comment": "нажатие на блок открывает камеру. выбрать из галереи нельзя. есть превью фото, можно переснять. полученное фото загружается в ячейку в ячейке src\\шаблон_таблицы_создание.xlsx\\делянки\\первое фото делянки\\делянка 2.",
+          "fontSize": 14,
+          "frame": {
+            "x": 43,
+            "y": 120,
+            "width": 305,
+            "height": 184
+          },
+          "type": "block"
+        },
+        {
+          "id": "button_2b61ff71",
+          "label": "далее",
+          "comment": "неактивна, пока не сделают фото.",
+          "fontSize": 15,
+          "frame": {
+            "x": 109,
+            "y": 589,
+            "width": 173,
+            "height": 68
+          },
+          "type": "button",
+          "targetId": "screen_d558d573"
+        },
+        {
+          "id": "button_1ed6b356",
+          "label": "Назад",
+          "comment": "",
+          "fontSize": 15,
+          "frame": {
+            "x": 109,
+            "y": 688,
+            "width": 173,
+            "height": 68
+          },
+          "type": "button",
+          "targetId": "screen_08c5ed90"
+        }
+      ]
+    },
+    {
+      "id": "screen_86d0a45c",
+      "kind": "screen",
+      "name": "создание сорта. делянка 1. количество рядков.",
+      "comment": "",
+      "position": {
+        "x": 3954,
+        "y": 732
+      },
+      "size": {
+        "width": 390,
+        "height": 844
+      },
+      "targetId": "",
+      "scrollEnabled": false,
+      "scrollOffset": 0,
+      "elements": [
+        {
+          "id": "list_53d7e76a",
+          "label": "Список",
+          "comment": "radio buttons. выбор только одного значения. цифра выбранного значения указывается в в ячейке src\\шаблон_таблицы_создание.xlsx\\делянки\\количество рядков\\делянка 1.",
+          "fontSize": 14,
+          "frame": {
+            "x": 71,
+            "y": 257,
+            "width": 250,
+            "height": 180
+          },
+          "type": "list",
+          "items": [
+            "4 рядка",
+            "8 рядков",
+            "10 рядков"
+          ]
+        },
+        {
+          "id": "text_000b32a1",
+          "label": "укажите клдичество рядков на делянке.",
+          "comment": "",
+          "fontSize": 18,
+          "frame": {
+            "x": 125,
+            "y": 99,
+            "width": 140,
+            "height": 119
+          },
+          "type": "text"
+        },
+        {
+          "id": "button_163f974b",
+          "label": "далее",
+          "comment": "пока не выбран одно из значений в списке, неактвана.",
+          "fontSize": 15,
+          "frame": {
+            "x": 109,
+            "y": 518,
+            "width": 173,
+            "height": 68
+          },
+          "type": "button",
+          "targetId": "screen_781b733c"
+        },
+        {
+          "id": "button_d43b8e05",
+          "label": "Назад",
+          "comment": "",
+          "fontSize": 15,
+          "frame": {
+            "x": 109,
+            "y": 646,
+            "width": 173,
+            "height": 68
+          },
+          "type": "button",
+          "targetId": "screen_8caf316b"
+        }
+      ]
+    },
+    {
+      "id": "screen_b9367a28",
+      "kind": "screen",
+      "name": "создание сорта. делянка 2. количество рядков.",
+      "comment": "",
+      "position": {
+        "x": 5590,
+        "y": 741
+      },
+      "size": {
+        "width": 390,
+        "height": 844
+      },
+      "targetId": "",
+      "scrollEnabled": false,
+      "scrollOffset": 0,
+      "elements": [
+        {
+          "id": "list_9a2092f3",
+          "label": "Список",
+          "comment": "radio buttons. выбор только одного значения. цифра выбранного значения указывается в в ячейке src\\шаблон_таблицы_создание.xlsx\\делянки\\количество рядков\\делянка 2.",
+          "fontSize": 14,
+          "frame": {
+            "x": 71,
+            "y": 257,
+            "width": 250,
+            "height": 180
+          },
+          "type": "list",
+          "items": [
+            "4 рядка",
+            "8 рядков",
+            "10 рядков"
+          ]
+        },
+        {
+          "id": "text_f8d60974",
+          "label": "укажите клдичество рядков на делянке.",
+          "comment": "",
+          "fontSize": 18,
+          "frame": {
+            "x": 125,
+            "y": 99,
+            "width": 140,
+            "height": 119
+          },
+          "type": "text"
+        },
+        {
+          "id": "button_6e3cf683",
+          "label": "далее",
+          "comment": "пока не выбран одно из значений в списке, неактвана.",
+          "fontSize": 15,
+          "frame": {
+            "x": 109,
+            "y": 538,
+            "width": 173,
+            "height": 68
+          },
+          "type": "button",
+          "targetId": "screen_08c5ed90"
+        },
+        {
+          "id": "button_faa3e6a3",
+          "label": "Назад",
+          "comment": "",
+          "fontSize": 15,
+          "frame": {
+            "x": 109,
+            "y": 646,
+            "width": 173,
+            "height": 68
+          },
+          "type": "button",
+          "targetId": "screen_b4b9b986"
+        }
+      ]
+    },
+    {
+      "id": "screen_d558d573",
+      "kind": "screen",
+      "name": "создание сорта. делянка 3. площадь.",
+      "comment": "",
+      "position": {
+        "x": 6523,
+        "y": 722
+      },
+      "size": {
+        "width": 390,
+        "height": 844
+      },
+      "targetId": "",
+      "scrollEnabled": false,
+      "scrollOffset": 0,
+      "elements": [
+        {
+          "id": "text_96084415",
+          "label": "подтвердите, что площадь делянки 1  5 кв.м",
+          "comment": "",
+          "fontSize": 18,
+          "frame": {
+            "x": 94,
+            "y": 106,
+            "width": 145,
+            "height": 95
+          },
+          "type": "text"
+        },
+        {
+          "id": "button_c0bb597c",
+          "label": "подтверждаю",
+          "comment": "после нажатия подтверждаю устанавливается значение \"да\" в ячейке src\\шаблон_таблицы_создание.xlsx\\делянки\\площадь делянки\\делянка 3.",
+          "fontSize": 11,
+          "frame": {
+            "x": 117,
+            "y": 556,
+            "width": 157,
+            "height": 63
+          },
+          "type": "button",
+          "targetId": "screen_460e671b"
+        },
+        {
+          "id": "button_d5a06090",
+          "label": "Назад",
+          "comment": "",
+          "fontSize": 15,
+          "frame": {
+            "x": 109,
+            "y": 658,
+            "width": 173,
+            "height": 68
+          },
+          "type": "button",
+          "targetId": "screen_1f45d2c6"
+        }
+      ]
+    },
+    {
+      "id": "screen_460e671b",
+      "kind": "screen",
+      "name": "создание сорта. делянка 3. расстояние межурядья.",
+      "comment": "",
+      "position": {
+        "x": 6858,
+        "y": 730
+      },
+      "size": {
+        "width": 390,
+        "height": 844
+      },
+      "targetId": "",
+      "scrollEnabled": false,
+      "scrollOffset": 0,
+      "elements": [
+        {
+          "id": "list_a6ab6e6f",
+          "label": "Список",
+          "comment": "radio buttons. выбор только одного значения. цифра выбранного значения указывается в создаваемой таблице в ячейке src\\шаблон_таблицы_создание.xlsx\\делянки\\расстояние межурядья\\делянка 3.",
+          "fontSize": 14,
+          "frame": {
+            "x": 71,
+            "y": 257,
+            "width": 250,
+            "height": 180
+          },
+          "type": "list",
+          "items": [
+            "15 см",
+            "45 см",
+            "70 см"
+          ]
+        },
+        {
+          "id": "text_9af46ca9",
+          "label": "укажите расстояние  между рядами",
+          "comment": "",
+          "fontSize": 18,
+          "frame": {
+            "x": 125,
+            "y": 99,
+            "width": 140,
+            "height": 95
+          },
+          "type": "text"
+        },
+        {
+          "id": "button_21e192e0",
+          "label": "далее",
+          "comment": "пока не выбран одно из значений в списке, неактвана.",
+          "fontSize": 15,
+          "frame": {
+            "x": 109,
+            "y": 538,
+            "width": 173,
+            "height": 68
+          },
+          "type": "button",
+          "targetId": "screen_0e24676f"
+        },
+        {
+          "id": "button_8e59c297",
+          "label": "Назад",
+          "comment": "",
+          "fontSize": 15,
+          "frame": {
+            "x": 109,
+            "y": 646,
+            "width": 173,
+            "height": 68
+          },
+          "type": "button",
+          "targetId": "screen_d558d573"
+        }
+      ]
+    },
+    {
+      "id": "screen_0e24676f",
+      "kind": "screen",
+      "name": "создание сорта. делянка 3. количество рядков.",
+      "comment": "",
+      "position": {
+        "x": 7183,
+        "y": 728
+      },
+      "size": {
+        "width": 390,
+        "height": 844
+      },
+      "targetId": "",
+      "scrollEnabled": false,
+      "scrollOffset": 0,
+      "elements": [
+        {
+          "id": "list_ee70d514",
+          "label": "Список",
+          "comment": "radio buttons. выбор только одного значения. цифра выбранного значения указывается в в ячейке src\\шаблон_таблицы_создание.xlsx\\делянки\\количество рядков\\делянка 3.",
+          "fontSize": 14,
+          "frame": {
+            "x": 71,
+            "y": 257,
+            "width": 250,
+            "height": 180
+          },
+          "type": "list",
+          "items": [
+            "4 рядка",
+            "8 рядков",
+            "10 рядков"
+          ]
+        },
+        {
+          "id": "text_de4ee2d5",
+          "label": "укажите клдичество рядков на делянке.",
+          "comment": "",
+          "fontSize": 18,
+          "frame": {
+            "x": 125,
+            "y": 99,
+            "width": 140,
+            "height": 119
+          },
+          "type": "text"
+        },
+        {
+          "id": "button_9eedffd8",
+          "label": "далее",
+          "comment": "пока не выбран одно из значений в списке, неактвана.",
+          "fontSize": 15,
+          "frame": {
+            "x": 109,
+            "y": 538,
+            "width": 173,
+            "height": 68
+          },
+          "type": "button",
+          "targetId": "screen_5eeb03fb"
+        },
+        {
+          "id": "button_08e168e5",
+          "label": "Назад",
+          "comment": "",
+          "fontSize": 15,
+          "frame": {
+            "x": 109,
+            "y": 646,
+            "width": 173,
+            "height": 68
+          },
+          "type": "button",
+          "targetId": "screen_460e671b"
+        }
+      ]
+    },
+    {
+      "id": "screen_08c5ed90",
+      "kind": "screen",
+      "name": "создание сорта. делянка 2. расстояние между растениями.",
+      "comment": "",
+      "position": {
+        "x": 5868,
+        "y": 713
+      },
+      "size": {
+        "width": 390,
+        "height": 844
+      },
+      "targetId": "",
+      "scrollEnabled": false,
+      "scrollOffset": 0,
+      "elements": [
+        {
+          "id": "text_2b52f68c",
+          "label": "подтвердите, что расстояние между  расстояниями  на делянке 1 всегда 8-10см.",
+          "comment": "",
+          "fontSize": 18,
+          "frame": {
+            "x": 105,
+            "y": 88,
+            "width": 181,
+            "height": 143
+          },
+          "type": "text"
+        },
+        {
+          "id": "button_ce218e33",
+          "label": "подтверждаю",
+          "comment": "нажатие кнопки устанавливает значение \"да\" в ячейке src\\шаблон_таблицы_создание.xlsx\\делянки\\расстояние между растениями\\делянка 2.",
+          "fontSize": 15,
+          "frame": {
+            "x": 105,
+            "y": 552,
+            "width": 182,
+            "height": 68
+          },
+          "type": "button",
+          "targetId": "screen_1f45d2c6"
+        },
+        {
+          "id": "button_ace9b860",
+          "label": "назад",
+          "comment": "",
+          "fontSize": 15,
+          "frame": {
+            "x": 114,
+            "y": 668,
+            "width": 173,
+            "height": 68
+          },
+          "type": "button",
+          "targetId": "screen_b9367a28"
+        }
+      ]
+    },
+    {
+      "id": "screen_75b2fe72",
+      "kind": "screen",
+      "name": "создание сорта. делянка 3.фото делянки.",
+      "comment": "",
+      "position": {
+        "x": 7839,
+        "y": 733
+      },
+      "size": {
+        "width": 390,
+        "height": 844
+      },
+      "targetId": "action_e476978c",
+      "scrollEnabled": false,
+      "scrollOffset": 0,
+      "elements": [
+        {
+          "id": "block_11db7876",
+          "label": "сделайте фотографию делянки.",
+          "comment": "нажатие на блок открывает камеру. выбрать из галереи нельзя. есть превью фото, можно переснять. полученное фото загружается в ячейку в ячейке src\\шаблон_таблицы_создание.xlsx\\делянки\\первое фото делянки\\делянка 3.",
+          "fontSize": 14,
+          "frame": {
+            "x": 43,
+            "y": 120,
+            "width": 305,
+            "height": 184
+          },
+          "type": "block"
+        },
+        {
+          "id": "button_47f1892d",
+          "label": "далее",
+          "comment": "неактивна, пока не сделают фото.",
+          "fontSize": 15,
+          "frame": {
+            "x": 109,
+            "y": 589,
+            "width": 173,
+            "height": 68
+          },
+          "type": "button",
+          "targetId": ""
+        },
+        {
+          "id": "button_7dff9f8e",
+          "label": "Назад",
+          "comment": "",
+          "fontSize": 15,
+          "frame": {
+            "x": 109,
+            "y": 688,
+            "width": 173,
+            "height": 68
+          },
+          "type": "button",
+          "targetId": "screen_5eeb03fb"
+        }
+      ]
+    },
+    {
+      "id": "screen_62b796d2",
+      "kind": "screen",
+      "name": "сорт 1 тест карточка",
+      "comment": "",
+      "position": {
+        "x": 1126,
+        "y": 1454
+      },
+      "size": {
+        "width": 390,
+        "height": 844
+      },
+      "targetId": "",
+      "scrollEnabled": true,
+      "scrollOffset": 706,
+      "elements": [
+        {
+          "id": "button_65808f8b",
+          "label": "Назад",
+          "comment": "",
+          "fontSize": 15,
+          "frame": {
+            "x": 69,
+            "y": 3484,
+            "width": 173,
+            "height": 68
+          },
+          "type": "button",
+          "targetId": "screen_f543bcff"
+        },
+        {
+          "id": "text_09e951f8",
+          "label": "сорт 1 тест",
+          "comment": "",
+          "fontSize": 18,
+          "frame": {
+            "x": 126,
+            "y": 88,
+            "width": 140,
+            "height": 47
+          },
+          "type": "text"
+        },
+        {
+          "id": "button_ebe52652",
+          "label": "календарь сорта",
+          "comment": "",
+          "fontSize": 15,
+          "frame": {
+            "x": 24,
+            "y": 157,
+            "width": 173,
+            "height": 87
+          },
+          "type": "button",
+          "targetId": ""
+        },
+        {
+          "id": "button_9a9fc2ec",
+          "label": "статистика",
+          "comment": "",
+          "fontSize": 15,
+          "frame": {
+            "x": 193,
+            "y": 166,
+            "width": 173,
+            "height": 68
+          },
+          "type": "button",
+          "targetId": ""
+        },
+        {
+          "id": "button_1fed761e",
+          "label": "вверх",
+          "comment": "скролл до начала экрана.",
+          "fontSize": 15,
+          "frame": {
+            "x": 69,
+            "y": 3593,
+            "width": 173,
+            "height": 68
+          },
+          "type": "button",
+          "targetId": ""
+        },
+        {
+          "id": "button_2178ac6d",
+          "type": "button",
+          "label": "1.фузариоз",
+          "comment": "",
+          "fontSize": 15,
+          "frame": {
+            "x": 34,
+            "y": 269,
+            "width": 173,
+            "height": 68
+          },
+          "targetId": "screen_ee28f40a"
+        },
+        {
+          "id": "button_56cbd523",
+          "type": "button",
+          "label": "2.септориоз",
+          "comment": "",
+          "fontSize": 15,
+          "frame": {
+            "x": 30,
+            "y": 355,
+            "width": 182,
+            "height": 68
+          },
+          "targetId": "screen_632cd366"
+        },
+        {
+          "id": "button_7b6fc2f9",
+          "type": "button",
+          "label": "3.Повреждение блошкой",
+          "comment": "",
+          "fontSize": 15,
+          "frame": {
+            "x": 34,
+            "y": 441,
+            "width": 200,
+            "height": 87
+          },
+          "targetId": "screen_19db306a"
+        },
+        {
+          "id": "button_0ac69fb2",
+          "type": "button",
+          "label": "4.Начало цветения",
+          "comment": "",
+          "fontSize": 15,
+          "frame": {
+            "x": 34,
+            "y": 546,
+            "width": 173,
+            "height": 87
+          },
+          "targetId": "screen_63353f12"
+        },
+        {
+          "id": "button_b9e655d7",
+          "type": "button",
+          "label": "5.Полное цветение",
+          "comment": "",
+          "fontSize": 15,
+          "frame": {
+            "x": 34,
+            "y": 652,
+            "width": 173,
+            "height": 87
+          },
+          "targetId": "screen_67aec0ea"
+        },
+        {
+          "id": "button_5a149669",
+          "type": "button",
+          "label": "6.Бактериоз",
+          "comment": "",
+          "fontSize": 15,
+          "frame": {
+            "x": 34,
+            "y": 763,
+            "width": 182,
+            "height": 68
+          },
+          "targetId": "screen_46b45849"
+        },
+        {
+          "id": "button_d92b044c",
+          "type": "button",
+          "label": "7.Пероноспороз",
+          "comment": "",
+          "fontSize": 15,
+          "frame": {
+            "x": 34,
+            "y": 854,
+            "width": 208,
+            "height": 68
+          },
+          "targetId": ""
+        },
+        {
+          "id": "button_9b0af485",
+          "type": "button",
+          "label": "8.Церкоспороз",
+          "comment": "",
+          "fontSize": 15,
+          "frame": {
+            "x": 34,
+            "y": 944,
+            "width": 200,
+            "height": 68
+          },
+          "targetId": ""
+        },
+        {
+          "id": "button_8a6aeaaa",
+          "type": "button",
+          "label": "9.Повреждение тлей",
+          "comment": "",
+          "fontSize": 15,
+          "frame": {
+            "x": 34,
+            "y": 1032,
+            "width": 200,
+            "height": 87
+          },
+          "targetId": ""
+        },
+        {
+          "id": "button_f73c8ec2",
+          "type": "button",
+          "label": "10.Цветок: окраска",
+          "comment": "",
+          "fontSize": 15,
+          "frame": {
+            "x": 34,
+            "y": 1139,
+            "width": 173,
+            "height": 87
+          },
+          "targetId": ""
+        },
+        {
+          "id": "button_a6347deb",
+          "type": "button",
+          "label": "11.Конец цветения",
+          "comment": "",
+          "fontSize": 15,
+          "frame": {
+            "x": 34,
+            "y": 1251,
+            "width": 173,
+            "height": 87
+          },
+          "targetId": ""
+        },
+        {
+          "id": "button_1e64e93c",
+          "type": "button",
+          "label": "12.Лист: форма бокового листочка",
+          "comment": "",
+          "fontSize": 15,
+          "frame": {
+            "x": 34,
+            "y": 1361,
+            "width": 173,
+            "height": 125
+          },
+          "targetId": ""
+        },
+        {
+          "id": "button_23513a34",
+          "type": "button",
+          "label": "13.Полное созревание",
+          "comment": "",
+          "fontSize": 15,
+          "frame": {
+            "x": 34,
+            "y": 1513,
+            "width": 173,
+            "height": 87
+          },
+          "targetId": ""
+        },
+        {
+          "id": "button_ea197770",
+          "type": "button",
+          "label": "14.Растение: окраска опушения главного стебляганию",
+          "comment": "",
+          "fontSize": 15,
+          "frame": {
+            "x": 34,
+            "y": 1627,
+            "width": 191,
+            "height": 144
+          },
+          "targetId": ""
+        },
+        {
+          "id": "button_1c1b8eff",
+          "type": "button",
+          "label": "15.Устойчивость к полеганию",
+          "comment": "",
+          "fontSize": 15,
+          "frame": {
+            "x": 26,
+            "y": 1790,
+            "width": 217,
+            "height": 87
+          },
+          "targetId": ""
+        },
+        {
+          "id": "button_8d77995d",
+          "type": "button",
+          "label": "16.Устойчивость к осыпанию",
+          "comment": "",
+          "fontSize": 15,
+          "frame": {
+            "x": 34,
+            "y": 1899,
+            "width": 217,
+            "height": 87
+          },
+          "targetId": ""
+        },
+        {
+          "id": "button_de037379",
+          "type": "button",
+          "label": "17.Длина стебля",
+          "comment": "",
+          "fontSize": 15,
+          "frame": {
+            "x": 34,
+            "y": 2013,
+            "width": 173,
+            "height": 87
+          },
+          "targetId": ""
+        },
+        {
+          "id": "button_829ae6cb",
+          "type": "button",
+          "label": "18.Высота прикрепления нижнего боба",
+          "comment": "",
+          "fontSize": 15,
+          "frame": {
+            "x": 34,
+            "y": 2132,
+            "width": 191,
+            "height": 106
+          },
+          "targetId": ""
+        },
+        {
+          "id": "button_0e0e074f",
+          "type": "button",
+          "label": "19.Количество продуктивных узлов на главном стебле",
+          "comment": "",
+          "fontSize": 15,
+          "frame": {
+            "x": 34,
+            "y": 2264,
+            "width": 200,
+            "height": 144
+          },
+          "targetId": ""
+        },
+        {
+          "id": "button_63876f4e",
+          "type": "button",
+          "label": "20.Количество ветвей",
+          "comment": "",
+          "fontSize": 15,
+          "frame": {
+            "x": 34,
+            "y": 2428,
+            "width": 200,
+            "height": 87
+          },
+          "targetId": ""
+        },
+        {
+          "id": "button_031d5d2b",
+          "type": "button",
+          "label": "21.Количество продуктивных бобов",
+          "comment": "",
+          "fontSize": 15,
+          "frame": {
+            "x": 34,
+            "y": 2533,
+            "width": 200,
+            "height": 106
+          },
+          "targetId": ""
+        },
+        {
+          "id": "button_e0f63d01",
+          "type": "button",
+          "label": "22.Количество бобов на продуктивный узел",
+          "comment": "",
+          "fontSize": 15,
+          "frame": {
+            "x": 34,
+            "y": 2655,
+            "width": 200,
+            "height": 125
+          },
+          "targetId": ""
+        },
+        {
+          "id": "button_304fe291",
+          "type": "button",
+          "label": "23.Количество семян с растения",
+          "comment": "",
+          "fontSize": 15,
+          "frame": {
+            "x": 34,
+            "y": 2793,
+            "width": 200,
+            "height": 106
+          },
+          "targetId": ""
+        },
+        {
+          "id": "button_245ebfbb",
+          "type": "button",
+          "label": "25.Масса семян с растения",
+          "comment": "",
+          "fontSize": 15,
+          "frame": {
+            "x": 34,
+            "y": 2907,
+            "width": 173,
+            "height": 106
+          },
+          "targetId": ""
+        },
+        {
+          "id": "button_803bec45",
+          "type": "button",
+          "label": "26.Урожайность с единицы площади",
+          "comment": "",
+          "fontSize": 15,
+          "frame": {
+            "x": 34,
+            "y": 3021,
+            "width": 208,
+            "height": 106
+          },
+          "targetId": ""
+        },
+        {
+          "id": "button_24cdb1d4",
+          "type": "button",
+          "label": "27.Масса 1000 семян",
+          "comment": "",
+          "fontSize": 15,
+          "frame": {
+            "x": 34,
+            "y": 3142,
+            "width": 173,
+            "height": 87
+          },
+          "targetId": ""
+        },
+        {
+          "id": "button_00acc331",
+          "type": "button",
+          "label": "28.Содержание белка",
+          "comment": "",
+          "fontSize": 15,
+          "frame": {
+            "x": 34,
+            "y": 3246,
+            "width": 200,
+            "height": 87
+          },
+          "targetId": ""
+        },
+        {
+          "id": "button_8a3912b3",
+          "type": "button",
+          "label": "29.Содержание жира",
+          "comment": "",
+          "fontSize": 15,
+          "frame": {
+            "x": 34,
+            "y": 3344,
+            "width": 200,
+            "height": 87
+          },
+          "targetId": ""
+        }
+      ]
+    },
+    {
+      "id": "screen_ee28f40a",
+      "kind": "screen",
+      "name": "1.фузариоз",
+      "comment": "",
+      "position": {
+        "x": 1135,
+        "y": 2012
+      },
+      "size": {
+        "width": 390,
+        "height": 844
+      },
+      "targetId": "",
+      "scrollEnabled": false,
+      "scrollOffset": 0,
+      "elements": []
+    },
+    {
+      "id": "screen_632cd366",
+      "kind": "screen",
+      "name": "2.септориоз",
+      "comment": "",
+      "position": {
+        "x": 1392,
+        "y": 2045
+      },
+      "size": {
+        "width": 390,
+        "height": 844
+      },
+      "targetId": "",
+      "scrollEnabled": false,
+      "scrollOffset": 0,
+      "elements": []
+    },
+    {
+      "id": "screen_19db306a",
+      "kind": "screen",
+      "name": "3.Повреждение блошкой",
+      "comment": "",
+      "position": {
+        "x": 1664,
+        "y": 2034
+      },
+      "size": {
+        "width": 390,
+        "height": 844
+      },
+      "targetId": "",
+      "scrollEnabled": false,
+      "scrollOffset": 0,
+      "elements": []
+    },
+    {
+      "id": "screen_63353f12",
+      "kind": "screen",
+      "name": "4.Начало цветения",
+      "comment": "",
+      "position": {
+        "x": 1946,
+        "y": 2041
+      },
+      "size": {
+        "width": 390,
+        "height": 844
+      },
+      "targetId": "",
+      "scrollEnabled": false,
+      "scrollOffset": 0,
+      "elements": []
+    },
+    {
+      "id": "screen_67aec0ea",
+      "kind": "screen",
+      "name": "5.Полное цветение",
+      "comment": "",
+      "position": {
+        "x": 2227,
+        "y": 2046
+      },
+      "size": {
+        "width": 390,
+        "height": 844
+      },
+      "targetId": "",
+      "scrollEnabled": false,
+      "scrollOffset": 0,
+      "elements": []
+    },
+    {
+      "id": "screen_46b45849",
+      "kind": "screen",
+      "name": "6.Бактериоз",
+      "comment": "",
+      "position": {
+        "x": 2496,
+        "y": 2050
+      },
+      "size": {
+        "width": 390,
+        "height": 844
+      },
+      "targetId": "",
+      "scrollEnabled": false,
+      "scrollOffset": 0,
+      "elements": []
+    },
+    {
+      "id": "screen_846d4d30",
+      "kind": "screen",
+      "name": "Экран 30",
+      "comment": "",
+      "position": {
+        "x": 2768,
+        "y": 2058
+      },
+      "size": {
+        "width": 390,
+        "height": 844
+      },
+      "targetId": "",
+      "scrollEnabled": false,
+      "scrollOffset": 0,
+      "elements": []
+    },
+    {
+      "id": "screen_a3087365",
+      "kind": "screen",
+      "name": "Экран 31",
+      "comment": "",
+      "position": {
+        "x": 3051,
+        "y": 2063
+      },
+      "size": {
+        "width": 390,
+        "height": 844
+      },
+      "targetId": "",
+      "scrollEnabled": false,
+      "scrollOffset": 0,
+      "elements": []
+    },
+    {
+      "id": "screen_d55cfdda",
+      "kind": "screen",
+      "name": "Экран 32",
+      "comment": "",
+      "position": {
+        "x": 3345,
+        "y": 2064
+      },
+      "size": {
+        "width": 390,
+        "height": 844
+      },
+      "targetId": "",
+      "scrollEnabled": false,
+      "scrollOffset": 0,
+      "elements": []
+    },
+    {
+      "id": "screen_774494b0",
+      "kind": "screen",
+      "name": "Экран 33",
+      "comment": "",
+      "position": {
+        "x": 3618,
+        "y": 2079
+      },
+      "size": {
+        "width": 390,
+        "height": 844
+      },
+      "targetId": "",
+      "scrollEnabled": false,
+      "scrollOffset": 0,
+      "elements": []
+    },
+    {
+      "id": "screen_1d4d40cb",
+      "kind": "screen",
+      "name": "Экран 34",
+      "comment": "",
+      "position": {
+        "x": 3895,
+        "y": 2088
+      },
+      "size": {
+        "width": 390,
+        "height": 844
+      },
+      "targetId": "",
+      "scrollEnabled": false,
+      "scrollOffset": 0,
+      "elements": []
+    },
+    {
+      "id": "screen_705e57e3",
+      "kind": "screen",
+      "name": "Экран 35",
+      "comment": "",
+      "position": {
+        "x": 4165,
+        "y": 2103
+      },
+      "size": {
+        "width": 390,
+        "height": 844
+      },
+      "targetId": "",
+      "scrollEnabled": false,
+      "scrollOffset": 0,
+      "elements": []
+    },
+    {
+      "id": "screen_051e965f",
+      "kind": "screen",
+      "name": "Экран 36",
+      "comment": "",
+      "position": {
+        "x": 4436,
+        "y": 2114
+      },
+      "size": {
+        "width": 390,
+        "height": 844
+      },
+      "targetId": "",
+      "scrollEnabled": false,
+      "scrollOffset": 0,
+      "elements": []
+    },
+    {
+      "id": "screen_3ca89211",
+      "kind": "screen",
+      "name": "Экран 37",
+      "comment": "",
+      "position": {
+        "x": 4705,
+        "y": 2126
+      },
+      "size": {
+        "width": 390,
+        "height": 844
+      },
+      "targetId": "",
+      "scrollEnabled": false,
+      "scrollOffset": 0,
+      "elements": []
+    },
+    {
+      "id": "screen_ae5f827b",
+      "kind": "screen",
+      "name": "Экран 38",
+      "comment": "",
+      "position": {
+        "x": 4982,
+        "y": 2139
+      },
+      "size": {
+        "width": 390,
+        "height": 844
+      },
+      "targetId": "",
+      "scrollEnabled": false,
+      "scrollOffset": 0,
+      "elements": []
+    },
+    {
+      "id": "screen_14689efc",
+      "kind": "screen",
+      "name": "Экран 39",
+      "comment": "",
+      "position": {
+        "x": 5245,
+        "y": 2156
+      },
+      "size": {
+        "width": 390,
+        "height": 844
+      },
+      "targetId": "",
+      "scrollEnabled": false,
+      "scrollOffset": 0,
+      "elements": []
+    },
+    {
+      "id": "screen_d118e3c9",
+      "kind": "screen",
+      "name": "Экран 40",
+      "comment": "",
+      "position": {
+        "x": 5514,
+        "y": 2163
+      },
+      "size": {
+        "width": 390,
+        "height": 844
+      },
+      "targetId": "",
+      "scrollEnabled": false,
+      "scrollOffset": 0,
+      "elements": []
+    },
+    {
+      "id": "screen_dd7351b2",
+      "kind": "screen",
+      "name": "Экран 41",
+      "comment": "",
+      "position": {
+        "x": 5774,
+        "y": 2164
+      },
+      "size": {
+        "width": 390,
+        "height": 844
+      },
+      "targetId": "",
+      "scrollEnabled": false,
+      "scrollOffset": 0,
+      "elements": []
+    },
+    {
+      "id": "screen_d6898e2e",
+      "kind": "screen",
+      "name": "Экран 42",
+      "comment": "",
+      "position": {
+        "x": 6023,
+        "y": 2162
+      },
+      "size": {
+        "width": 390,
+        "height": 844
+      },
+      "targetId": "",
+      "scrollEnabled": false,
+      "scrollOffset": 0,
+      "elements": []
+    },
+    {
+      "id": "screen_20cf2da6",
+      "kind": "screen",
+      "name": "Экран 43",
+      "comment": "",
+      "position": {
+        "x": 6265,
+        "y": 2161
+      },
+      "size": {
+        "width": 390,
+        "height": 844
+      },
+      "targetId": "",
+      "scrollEnabled": false,
+      "scrollOffset": 0,
+      "elements": []
+    },
+    {
+      "id": "screen_7b7bc1ec",
+      "kind": "screen",
+      "name": "Экран 44",
+      "comment": "",
+      "position": {
+        "x": 6524,
+        "y": 2161
+      },
+      "size": {
+        "width": 390,
+        "height": 844
+      },
+      "targetId": "",
+      "scrollEnabled": false,
+      "scrollOffset": 0,
+      "elements": []
+    },
+    {
+      "id": "screen_88f856ba",
+      "kind": "screen",
+      "name": "Экран 45",
+      "comment": "",
+      "position": {
+        "x": 6779,
+        "y": 2171
+      },
+      "size": {
+        "width": 390,
+        "height": 844
+      },
+      "targetId": "",
+      "scrollEnabled": false,
+      "scrollOffset": 0,
+      "elements": []
+    },
+    {
+      "id": "screen_04fe9e12",
+      "kind": "screen",
+      "name": "Экран 46",
+      "comment": "",
+      "position": {
+        "x": 7033,
+        "y": 2181
+      },
+      "size": {
+        "width": 390,
+        "height": 844
+      },
+      "targetId": "",
+      "scrollEnabled": false,
+      "scrollOffset": 0,
+      "elements": []
+    },
+    {
+      "id": "screen_d37e56e7",
+      "kind": "screen",
+      "name": "Экран 47",
+      "comment": "",
+      "position": {
+        "x": 7300,
+        "y": 2177
+      },
+      "size": {
+        "width": 390,
+        "height": 844
+      },
+      "targetId": "",
+      "scrollEnabled": false,
+      "scrollOffset": 0,
+      "elements": []
+    },
+    {
+      "id": "screen_3d8873a9",
+      "kind": "screen",
+      "name": "Экран 48",
+      "comment": "",
+      "position": {
+        "x": 7570,
+        "y": 2181
+      },
+      "size": {
+        "width": 390,
+        "height": 844
+      },
+      "targetId": "",
+      "scrollEnabled": false,
+      "scrollOffset": 0,
+      "elements": []
+    },
+    {
+      "id": "screen_d36d4541",
+      "kind": "screen",
+      "name": "Экран 49",
+      "comment": "",
+      "position": {
+        "x": 7842,
+        "y": 2179
+      },
+      "size": {
+        "width": 390,
+        "height": 844
+      },
+      "targetId": "",
+      "scrollEnabled": false,
+      "scrollOffset": 0,
+      "elements": []
+    },
+    {
+      "id": "screen_1a5ef412",
+      "kind": "screen",
+      "name": "Экран 50",
+      "comment": "",
+      "position": {
+        "x": 8105,
+        "y": 2189
+      },
+      "size": {
+        "width": 390,
+        "height": 844
+      },
+      "targetId": "",
+      "scrollEnabled": false,
+      "scrollOffset": 0,
+      "elements": []
+    },
+    {
+      "id": "screen_f27a2c47",
+      "kind": "screen",
+      "name": "Экран 51",
+      "comment": "",
+      "position": {
+        "x": 8359,
+        "y": 2197
+      },
+      "size": {
+        "width": 390,
+        "height": 844
+      },
+      "targetId": "",
+      "scrollEnabled": false,
+      "scrollOffset": 0,
+      "elements": []
+    },
+    {
+      "id": "screen_c147d338",
+      "kind": "screen",
+      "name": "Экран 52",
+      "comment": "",
+      "position": {
+        "x": 8613,
+        "y": 2198
+      },
+      "size": {
+        "width": 390,
+        "height": 844
+      },
+      "targetId": "",
+      "scrollEnabled": false,
+      "scrollOffset": 0,
+      "elements": []
+    }
+  ],
+  "actions": [
+    {
+      "id": "action_e3db4a91",
+      "kind": "action",
+      "name": "считывание из буфера обмена",
+      "comment": "",
+      "position": {
+        "x": 1946,
+        "y": 495
+      },
+      "size": {
+        "width": 188,
+        "height": 188
+      },
+      "targetId": "screen_e2c06dae"
+    },
+    {
+      "id": "action_e476978c",
+      "kind": "action",
+      "name": "создание в google sheets таблицы с внесенной информацией. переход на экран список сортов.",
+      "comment": "",
+      "position": {
+        "x": 8230,
+        "y": 924
+      },
+      "size": {
+        "width": 188,
+        "height": 188
+      },
+      "targetId": "screen_f543bcff"
+    }
+  ]
+}

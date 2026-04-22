@@ -1,0 +1,91 @@
+import React from 'react';
+import { Alert, Text } from 'react-native';
+import { NativeStackScreenProps } from '@react-navigation/native-stack';
+
+import { Button, Card, Screen, StatPill, Title, uiStyles } from '../components/Ui';
+import { v2Copy } from '../config/copy';
+import { useV2App } from '../context/V2AppContext';
+import { V2RootStackParamList } from '../navigation/types';
+
+export function StartScreen({
+  navigation,
+}: NativeStackScreenProps<V2RootStackParamList, 'Start'>) {
+  const { state } = useV2App();
+
+  return (
+    <Screen>
+      <Title subtitle={v2Copy.startSubtitle}>{v2Copy.appTitle}</Title>
+      <Card>
+        <Text style={uiStyles.paragraph}>{v2Copy.startIntro}</Text>
+        <Button label={v2Copy.startLink} onPress={() => navigation.navigate('Auth', { mode: 'link' })} />
+        <Button label={v2Copy.startCreate} onPress={() => navigation.navigate('Auth', { mode: 'create' })} />
+        <Button
+          label={v2Copy.startCatalog}
+          variant="secondary"
+          disabled={!state.catalog.length}
+          onPress={() => navigation.navigate('Catalog')}
+        />
+        <Button label={v2Copy.startQueue} variant="ghost" onPress={() => navigation.navigate('Queue')} />
+      </Card>
+      <Card>
+        <StatPill label={v2Copy.googleDisabled} tone="warning" />
+        <Button
+          label={v2Copy.analyst}
+          variant="ghost"
+          onPress={() => navigation.navigate('PlaceholderRole', { role: 'analyst' })}
+        />
+        <Button
+          label={v2Copy.manager}
+          variant="ghost"
+          onPress={() => navigation.navigate('PlaceholderRole', { role: 'manager' })}
+        />
+      </Card>
+    </Screen>
+  );
+}
+
+export function AuthScreen({
+  route,
+  navigation,
+}: NativeStackScreenProps<V2RootStackParamList, 'Auth'>) {
+  const { prepareMode, importVarietyFromClipboard, beginCreation } = useV2App();
+
+  const proceed = async () => {
+    try {
+      await prepareMode(route.params.mode);
+
+      if (route.params.mode === 'link') {
+        await importVarietyFromClipboard();
+        navigation.reset({
+          index: 0,
+          routes: [{ name: 'Catalog' }],
+        });
+        return;
+      }
+
+      beginCreation();
+      navigation.replace('Creation');
+    } catch (error) {
+      Alert.alert(
+        v2Copy.errorTitle,
+        error instanceof Error ? error.message : v2Copy.continueFailed,
+      );
+    }
+  };
+
+  return (
+    <Screen>
+      <Title>{route.params.mode === 'link' ? v2Copy.authLinkTitle : v2Copy.authCreateTitle}</Title>
+      <Card>
+        <Text style={uiStyles.paragraph}>
+          {route.params.mode === 'link' ? v2Copy.authLinkBody : v2Copy.authCreateBody}
+        </Text>
+        <Button
+          label={route.params.mode === 'link' ? v2Copy.authLinkAction : v2Copy.authCreateAction}
+          onPress={() => void proceed()}
+        />
+        <Button label={v2Copy.back} variant="secondary" onPress={() => navigation.goBack()} />
+      </Card>
+    </Screen>
+  );
+}

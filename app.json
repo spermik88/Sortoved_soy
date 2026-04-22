@@ -2,6 +2,7 @@
   "expo": {
     "name": "Sortoved Soy",
     "slug": "sortoved-soy",
+    "scheme": "sortovedsoy",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -14,11 +15,14 @@
     },
     "ios": {
       "supportsTablet": true,
+      "bundleIdentifier": "com.sortoved.soy",
       "infoPlist": {
-        "NSCameraUsageDescription": "Камера используется для сканирования QR-кодов и фотографирования делянок."
+        "NSCameraUsageDescription": "Камера используется для фотографирования делянок и признаков сорта.",
+        "NSLocationWhenInUseUsageDescription": "Геолокация используется для привязки делянок и фото к координатам."
       }
     },
     "android": {
+      "package": "com.sortoved.soy",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
@@ -26,7 +30,9 @@
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
       "permissions": [
-        "CAMERA"
+        "CAMERA",
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_FINE_LOCATION"
       ]
     },
     "web": {
