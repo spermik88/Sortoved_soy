@@ -29,16 +29,6 @@ export function StartScreen({
       </Card>
       <Card>
         <StatPill label={v2Copy.googleDisabled} tone="warning" />
-        <Button
-          label={v2Copy.analyst}
-          variant="ghost"
-          onPress={() => navigation.navigate('PlaceholderRole', { role: 'analyst' })}
-        />
-        <Button
-          label={v2Copy.manager}
-          variant="ghost"
-          onPress={() => navigation.navigate('PlaceholderRole', { role: 'manager' })}
-        />
       </Card>
     </Screen>
   );

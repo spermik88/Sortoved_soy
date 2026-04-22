@@ -4,9 +4,14 @@ export function todayIsoDate() {
   return new Date().toISOString().slice(0, 10);
 }
 
-export function formatPhotoMeta(email: string | undefined, mapsUrl: string | undefined) {
-  const now = new Date();
-  const stamp = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')} ${todayIsoDate()}`;
+export function formatPhotoMeta(
+  email: string | undefined,
+  mapsUrl: string | undefined,
+  timestamp?: string,
+) {
+  const now = timestamp ? new Date(timestamp) : new Date();
+  const day = `${String(now.getDate()).padStart(2, '0')}.${String(now.getMonth() + 1).padStart(2, '0')}.${now.getFullYear()}`;
+  const stamp = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')} ${day}`;
   return `${stamp}, ${email || v2Copy.unknownUser}, ${mapsUrl || v2Copy.noMap}`;
 }
 

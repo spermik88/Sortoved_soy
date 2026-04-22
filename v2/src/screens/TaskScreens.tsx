@@ -6,7 +6,6 @@ import {
   Button,
   Card,
   Field,
-  LinkText,
   PhotoFrame,
   Screen,
   Title,
@@ -16,7 +15,9 @@ import { v2Copy } from '../config/copy';
 import { taskDefinitionsByCode } from '../config/flowRegistry';
 import { useV2App } from '../context/V2AppContext';
 import { V2RootStackParamList } from '../navigation/types';
+import { locationService } from '../services/locationService';
 import { mediaCaptureService } from '../services/mediaCaptureService';
+import { InspectionCardDraft } from '../types/app';
 
 function useTaskData(varietyId: string, taskCode: string) {
   const ctx = useV2App();
@@ -59,73 +60,28 @@ function returnToVariety(
   });
 }
 
-export function FusariumOverviewScreen({
-  route,
-  navigation,
-}: NativeStackScreenProps<V2RootStackParamList, 'FusariumOverview'>) {
-  const { variety, task, saveOverviewPhoto, markOverviewComplete } = useTaskData(
-    route.params.varietyId,
-    route.params.taskCode,
-  );
-
-  if (!variety) {
-    return null;
+function getDiseaseCardStatusLabel(card: InspectionCardDraft) {
+  if (card.syncStatus === 'synced') {
+    return v2Copy.taskSyncedCard;
   }
+  if (card.syncStatus === 'failed') {
+    return v2Copy.taskFailedCard;
+  }
+  if (card.syncStatus === 'queued') {
+    return v2Copy.taskQueuedCard;
+  }
+  if (card.isComplete) {
+    return v2Copy.taskSavedCard;
+  }
+  return v2Copy.taskDraftCard;
+}
 
-  const captureOverview = async () => {
-    const result = await mediaCaptureService.capturePhoto();
-    if (result.kind === 'success') {
-      saveOverviewPhoto(variety.id, task.code, result.uri);
-    }
-  };
+function isLockedDiseaseCard(card: InspectionCardDraft) {
+  return ['queued', 'synced', 'failed'].includes(card.syncStatus || '');
+}
 
-  const continueToCards = async () => {
-    try {
-      markOverviewComplete(variety.id, task.code);
-      navigation.navigate('FusariumCards', {
-        varietyId: variety.id,
-        taskCode: task.code,
-      });
-    } catch (error) {
-      Alert.alert(
-        v2Copy.errorTitle,
-        error instanceof Error ? error.message : v2Copy.continueFailed,
-      );
-    }
-  };
-
-  return (
-    <Screen>
-      <TaskHeader
-        title={v2Copy.fusariumOverviewTitle}
-        subtitle={variety.title}
-        intro={task.overviewHint || v2Copy.fusariumOverviewHint}
-      />
-      <Card>
-        <Text style={uiStyles.paragraph}>{v2Copy.taskSourcePlotPhoto}</Text>
-        <PhotoFrame
-          uri={variety.setup?.plotPhotos?.['1']}
-          fallback={v2Copy.taskSourcePlotPhotoMissing}
-        />
-      </Card>
-      <Card>
-        <Text style={uiStyles.paragraph}>{v2Copy.taskSourceMap}</Text>
-        <LinkText
-          label={variety.setup?.mapsUrl ? v2Copy.taskOpenMap : v2Copy.taskSourceMapMissing}
-          url={variety.setup?.mapsUrl}
-        />
-      </Card>
-      <Card>
-        <PhotoFrame uri={task.overviewPhotoUri} fallback={v2Copy.taskOverviewMissing} />
-        <Button
-          label={task.overviewPhotoUri ? v2Copy.taskRetakeOverview : v2Copy.taskTakeOverview}
-          onPress={() => void captureOverview()}
-        />
-        <Button label={v2Copy.back} variant="ghost" onPress={() => navigation.goBack()} />
-        <Button label={v2Copy.goToCards} onPress={() => void continueToCards()} />
-      </Card>
-    </Screen>
-  );
+function captureTimestamp() {
+  return new Date().toISOString();
 }
 
 export function FusariumCardsScreen({
@@ -135,34 +91,42 @@ export function FusariumCardsScreen({
   const {
     variety,
     task,
+    taskDef,
     addTaskCard,
     completeTaskCard,
     updateTaskCard,
     removeTaskCard,
-    completeTaskLocally,
-    queueTaskSubmission,
   } = useTaskData(route.params.varietyId, route.params.taskCode);
 
-  if (!variety) {
+  if (!variety || !taskDef) {
     return null;
   }
 
   const captureCardPhoto = async (cardId: string) => {
     const result = await mediaCaptureService.capturePhoto();
-    if (result.kind === 'success') {
+    if (result.kind !== 'success') {
+      return;
+    }
+
+    try {
+      const location = await locationService.getCurrentLocation();
       updateTaskCard(variety.id, task.code, cardId, {
         photoUri: result.uri,
         note: task.title,
+        capturedAt: captureTimestamp(),
+        capturedLocation: location,
       });
+    } catch (error) {
+      Alert.alert(
+        v2Copy.errorTitle,
+        error instanceof Error ? error.message : v2Copy.taskDiseaseLocationRequired,
+      );
     }
   };
 
-  const completeAndQueue = async () => {
+  const saveCard = async (cardId: string) => {
     try {
-      completeTaskLocally(variety.id, task.code);
-      await queueTaskSubmission(variety.id, task.code);
-      Alert.alert(v2Copy.doneTitle, v2Copy.taskQueuedDone);
-      returnToVariety(navigation, variety.id);
+      await completeTaskCard(variety.id, task.code, cardId);
     } catch (error) {
       Alert.alert(
         v2Copy.errorTitle,
@@ -174,64 +138,91 @@ export function FusariumCardsScreen({
   return (
     <Screen>
       <TaskHeader
-        title={v2Copy.fusariumCardsTitle}
+        title={task.title}
         subtitle={variety.title}
-        intro={task.cardsHint || v2Copy.fusariumCardsHint}
+        intro={task.cardsHint || task.intro || v2Copy.fusariumCardsHint}
       />
       <Card>
-        <Text style={uiStyles.paragraph}>{v2Copy.taskExamplesTitle}</Text>
+        <Text style={uiStyles.paragraph}>{`${v2Copy.taskExamplesTitle}: ${task.title}`}</Text>
         <Text style={uiStyles.paragraph}>{v2Copy.taskExamplesBody}</Text>
       </Card>
       <Card>
-        {task.cards.map((card, index) => (
-          <View key={card.id} style={{ gap: 8, paddingBottom: 16 }}>
-            <Text style={uiStyles.paragraph}>
-              {v2Copy.taskCard} {index + 1}
-            </Text>
-            <PhotoFrame uri={card.photoUri} fallback={v2Copy.taskCardPhotoMissing} />
-            <Button
-              label={card.photoUri ? v2Copy.taskRetakeCardPhoto : v2Copy.taskTakeCardPhoto}
-              variant="secondary"
-              disabled={card.isComplete}
-              onPress={() => void captureCardPhoto(card.id)}
-            />
-            <Field
-              label={v2Copy.taskPlantNumber}
-              value={card.plantNumber || ''}
-              editable={!card.isComplete}
-              keyboardType="numeric"
-              onChangeText={(value) =>
-                updateTaskCard(variety.id, task.code, card.id, { plantNumber: value, note: task.title })
-              }
-            />
-            <Field
-              label={v2Copy.taskRowNumber}
-              value={card.rowNumber || ''}
-              editable={!card.isComplete}
-              keyboardType="numeric"
-              onChangeText={(value) =>
-                updateTaskCard(variety.id, task.code, card.id, { rowNumber: value, note: task.title })
-              }
-            />
-            <Button
-              label={card.isComplete ? v2Copy.taskCardReady : v2Copy.taskCompleteCard}
-              variant={card.isComplete ? 'secondary' : 'primary'}
-              disabled={card.isComplete}
-              onPress={() => completeTaskCard(variety.id, task.code, card.id)}
-            />
-            <Button
-              label={v2Copy.taskDeleteCard}
-              variant="ghost"
-              onPress={() => removeTaskCard(variety.id, task.code, card.id)}
-            />
-          </View>
-        ))}
+        {task.cards.map((card, index) => {
+          const locked = isLockedDiseaseCard(card);
+          return (
+            <View key={card.id} style={{ gap: 8, paddingBottom: 16 }}>
+              <Text style={uiStyles.paragraph}>
+                {v2Copy.taskCard} {index + 1} • {getDiseaseCardStatusLabel(card)}
+              </Text>
+              <PhotoFrame uri={card.photoUri} fallback={v2Copy.taskCardPhotoMissing} />
+              <Button
+                label={card.photoUri ? v2Copy.taskRetakeCardPhoto : v2Copy.taskTakeCardPhoto}
+                variant="secondary"
+                disabled={locked}
+                onPress={() => void captureCardPhoto(card.id)}
+              />
+              <Field
+                label={v2Copy.taskPlot}
+                value={card.plot || ''}
+                editable={!locked}
+                onChangeText={(value) =>
+                  updateTaskCard(variety.id, task.code, card.id, {
+                    plot: value.trim() as '1' | '2' | '3',
+                    note: task.title,
+                  })
+                }
+                placeholder={v2Copy.taskPlotPlaceholder}
+              />
+              <Field
+                label={v2Copy.taskRowNumber}
+                value={card.rowNumber || ''}
+                editable={!locked}
+                keyboardType="numeric"
+                onChangeText={(value) =>
+                  updateTaskCard(variety.id, task.code, card.id, {
+                    rowNumber: value,
+                    note: task.title,
+                  })
+                }
+              />
+              <Field
+                label={v2Copy.taskPlantNumber}
+                value={card.plantNumber || ''}
+                editable={!locked}
+                keyboardType="numeric"
+                onChangeText={(value) =>
+                  updateTaskCard(variety.id, task.code, card.id, {
+                    plantNumber: value,
+                    note: task.title,
+                  })
+                }
+              />
+              <Button
+                label={locked ? v2Copy.taskCardReady : v2Copy.taskSaveCard}
+                variant={locked ? 'secondary' : 'primary'}
+                disabled={locked}
+                onPress={() => void saveCard(card.id)}
+              />
+              {!locked ? (
+                <Button
+                  label={v2Copy.taskDeleteCard}
+                  variant="ghost"
+                  onPress={() => removeTaskCard(variety.id, task.code, card.id)}
+                />
+              ) : null}
+            </View>
+          );
+        })}
         <Button
           label={v2Copy.taskAddInfection}
           onPress={() => addTaskCard(variety.id, task.code)}
         />
+        <Button
+          label={v2Copy.returnToVariety}
+          variant="secondary"
+          onPress={() => returnToVariety(navigation, variety.id)}
+        />
         <Button label={v2Copy.back} variant="ghost" onPress={() => navigation.goBack()} />
-        <Button label={v2Copy.completeStep} onPress={() => void completeAndQueue()} />
       </Card>
     </Screen>
   );

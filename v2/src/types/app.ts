@@ -3,8 +3,17 @@ export type ScreenId = string;
 export type VarietySource = 'created' | 'linked';
 export type QueueStatus = 'queued' | 'processing' | 'synced' | 'failed' | 'waiting_for_auth';
 export type TaskKind = 'infection' | 'measurement' | 'observation';
+export type DiseaseSheetKey =
+  | 'fusarium_sheet'
+  | 'septoria_sheet'
+  | 'flea_sheet'
+  | 'bacteriosis_sheet'
+  | 'peronosporosis_sheet'
+  | 'cercosporosis_sheet'
+  | 'aphid_damage_sheet';
 export type TaskFlowKind =
   | 'infection_split'
+  | 'disease_cards'
   | 'observation_single'
   | 'measurement_cards'
   | 'placeholder_pending_spec';
@@ -31,6 +40,9 @@ export interface VarietySheetBinding {
 export interface VarietySetupSnapshot {
   mapsUrl?: string;
   plotPhotos?: Partial<Record<'1' | '2' | '3', string>>;
+  localWorkbookPath?: string;
+  localWorkbook?: Record<string, (string | number | boolean)[][]>;
+  sheetAliases?: Partial<Record<DiseaseSheetKey, string>>;
 }
 
 export interface VarietyRecord {
@@ -72,6 +84,15 @@ export interface InspectionCardDraft {
   plot?: '1' | '2' | '3';
   value?: string;
   isComplete: boolean;
+  syncStatus?: 'draft' | 'queued' | 'synced' | 'failed';
+  queuedOperationId?: string;
+  capturedAt?: string;
+  capturedLocation?: {
+    latitude: number;
+    longitude: number;
+    mapsUrl: string;
+  };
+  localWorkbookRow?: number;
 }
 
 export interface InspectionTask {

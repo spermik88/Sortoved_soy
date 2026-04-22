@@ -10,6 +10,7 @@ import React, {
 
 import { v2Copy } from '../config/copy';
 import { creationSteps, taskDefinitionsByCode } from '../config/flowRegistry';
+import { SHEET_ALIASES } from '../config/templateSchema';
 import { v2Repository } from '../repositories/v2Repository';
 import { clipboardService } from '../services/clipboardService';
 import { locationService } from '../services/locationService';
@@ -18,6 +19,7 @@ import { isValidGoogleSheetsUrl } from '../services/sheetsService';
 import { templateService } from '../services/templateService';
 import {
   AuthMode,
+  DiseaseSheetKey,
   InspectionCardDraft,
   InspectionTask,
   PersistedV2State,
@@ -65,19 +67,23 @@ function buildImportedVarietyTitle(rawUrl: string) {
   try {
     const parsed = new URL(rawUrl);
     const gid = parsed.searchParams.get('gid');
-    return gid
-      ? `${v2Copy.importedVarietyPrefix} ${gid}`
-      : v2Copy.importedVarietyFallback;
+    return gid ? `${v2Copy.importedVarietyPrefix} ${gid}` : v2Copy.importedVarietyFallback;
   } catch {
     return v2Copy.importedVarietyFallback;
   }
 }
 
-function getTaskQueueEntries(
-  queue: QueuedOperation[],
-  varietyId: string,
-  taskCode: string,
-) {
+function createWorkbookSetup(varietyId: string, draft?: VarietyCreationDraft) {
+  return {
+    localWorkbookPath: `local-workbook://${varietyId}.json`,
+    localWorkbook: templateService.createLocalWorkbookCopy(draft),
+    sheetAliases: Object.fromEntries(
+      Object.entries(SHEET_ALIASES).map(([key, value]) => [key, value.local]),
+    ) as Partial<Record<DiseaseSheetKey, string>>,
+  };
+}
+
+function getTaskQueueEntries(queue: QueuedOperation[], varietyId: string, taskCode: string) {
   return queue
     .filter(
       (item) =>
@@ -91,11 +97,7 @@ function getTaskQueueEntries(
     );
 }
 
-function stripTaskQueueEntries(
-  queue: QueuedOperation[],
-  varietyId: string,
-  taskCode: string,
-) {
+function stripTaskQueueEntries(queue: QueuedOperation[], varietyId: string, taskCode: string) {
   return queue.filter(
     (item) =>
       !(
@@ -106,11 +108,39 @@ function stripTaskQueueEntries(
   );
 }
 
+function isDraftDiseaseCard(card: InspectionCardDraft) {
+  return !card.syncStatus || card.syncStatus === 'draft';
+}
+
+function isLockedDiseaseCard(card: InspectionCardDraft) {
+  return ['queued', 'synced', 'failed'].includes(card.syncStatus || '');
+}
+
 function getTaskUiStatus(
   varietyId: string,
   task: InspectionTask,
   queue: QueuedOperation[],
 ): TaskUiStatus {
+  if (task.flowKind === 'disease_cards') {
+    if (!task.cards.length) {
+      return 'not_started';
+    }
+
+    if (task.cards.some((card) => isDraftDiseaseCard(card))) {
+      return 'draft';
+    }
+
+    if (task.cards.some((card) => ['queued', 'failed'].includes(card.syncStatus || ''))) {
+      return 'queued';
+    }
+
+    if (task.cards.some((card) => card.syncStatus === 'synced')) {
+      return 'processed';
+    }
+
+    return 'ready_local';
+  }
+
   const [taskQueue] = getTaskQueueEntries(queue, varietyId, task.code);
 
   if (taskQueue?.status === 'synced') {
@@ -132,12 +162,13 @@ function getTaskUiStatus(
   return 'not_started';
 }
 
-function isInfectionCardComplete(card: InspectionCardDraft) {
+function isDiseaseCardComplete(card: InspectionCardDraft) {
   return Boolean(
     card.photoUri &&
-      card.note.trim() &&
       card.rowNumber?.trim() &&
-      card.plantNumber?.trim(),
+      card.plot &&
+      card.capturedAt &&
+      card.capturedLocation?.mapsUrl,
   );
 }
 
@@ -162,8 +193,8 @@ function finalizeTask(
     cardsCompleted:
       task.flowKind === 'measurement_cards'
         ? task.cards.length > 0 && task.cards.every(isMeasurementCardComplete)
-        : task.flowKind === 'infection_split'
-          ? task.cards.length > 0 && task.cards.every(isInfectionCardComplete)
+        : task.flowKind === 'disease_cards'
+          ? task.cards.length > 0 && task.cards.every((card) => card.syncStatus === 'synced')
           : task.cardsCompleted,
     updatedAt: task.completedAt ? task.updatedAt : completedAt,
   };
@@ -261,7 +292,7 @@ interface V2ContextValue {
     cardId: string,
     changes: Partial<InspectionCardDraft>,
   ): void;
-  completeTaskCard(varietyId: string, taskCode: string, cardId: string): void;
+  completeTaskCard(varietyId: string, taskCode: string, cardId: string): Promise<void>;
   removeTaskCard(varietyId: string, taskCode: string, cardId: string): void;
   completeTaskLocally(varietyId: string, taskCode: string): void;
   queueTaskSubmission(varietyId: string, taskCode: string): Promise<void>;
@@ -305,6 +336,105 @@ export function V2AppProvider({ children }: { children: ReactNode }) {
     return () => sub.remove();
   }, []);
 
+  async function processDiseaseCardOperation(item: QueuedOperation) {
+    const payload = item.payload as Record<string, unknown>;
+    const varietyId = item.varietyId;
+    const taskCode = String(payload.taskCode || item.screenId || '');
+    const cardId = String(payload.cardId || '');
+    const logicalSheetKey = payload.logicalSheetKey as DiseaseSheetKey | undefined;
+    const plot = payload.plot as '1' | '2' | '3';
+    const rowNumber = String(payload.rowNumber || '');
+    const plantNumber = payload.plantNumber ? String(payload.plantNumber) : undefined;
+    const capturedAt = payload.capturedAt ? String(payload.capturedAt) : undefined;
+    const capturedLocation = payload.capturedLocation as
+      | { mapsUrl?: string }
+      | undefined;
+    if (!varietyId || !taskCode || !cardId || !plot || !rowNumber || !logicalSheetKey) {
+      throw new Error(v2Copy.localSyncError);
+    }
+
+    setState((current) => {
+      const variety = current.catalog.find((entry) => entry.id === varietyId);
+      if (!variety) {
+        throw new Error(v2Copy.varietyNotFound);
+      }
+
+      const workbook =
+        variety.setup?.localWorkbook || templateService.createLocalWorkbookCopy();
+      const nextWorkbook = JSON.parse(JSON.stringify(workbook)) as Record<
+        string,
+        (string | number | boolean)[][]
+      >;
+      const applied = templateService.applyDiseaseCardWrite(nextWorkbook, logicalSheetKey, {
+        plot,
+        rowNumber,
+        plantNumber,
+        capturedAt,
+        mapsUrl: capturedLocation?.mapsUrl,
+        userEmail: current.session?.email,
+      });
+
+      const nextQueue: QueuedOperation[] = current.syncQueue.map((entry) =>
+        entry.id === item.id
+          ? ({
+              ...entry,
+              status: 'synced',
+              updatedAt: new Date().toISOString(),
+              lastError: undefined,
+            } satisfies QueuedOperation)
+          : entry,
+      );
+
+      const task = current.inspections[varietyId]?.[taskCode] || createTaskFromDefinition(varietyId, taskCode, nextQueue);
+      const nextTask: InspectionTask = {
+        ...task,
+        cardsCompleted: task.cards.some((card) => card.id === cardId) || task.cardsCompleted,
+        completedAt: task.completedAt || new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        cards: task.cards.map((card) =>
+          card.id === cardId
+            ? {
+                ...card,
+                syncStatus: 'synced',
+                localWorkbookRow: applied.rowIndex + 1,
+                queuedOperationId: item.id,
+              }
+            : card,
+        ),
+        uiStatus: 'processed',
+      };
+
+      return {
+        ...current,
+        syncQueue: nextQueue,
+        catalog: current.catalog.map((entry) =>
+          entry.id === varietyId
+            ? {
+                ...entry,
+                status: 'ready',
+                updatedAt: new Date().toISOString(),
+                lastError: undefined,
+                setup: {
+                  ...entry.setup,
+                  localWorkbook: applied.workbook,
+                },
+              }
+            : entry,
+        ),
+        inspections: {
+          ...current.inspections,
+          [varietyId]: {
+            ...current.inspections[varietyId],
+            [taskCode]: {
+              ...nextTask,
+              uiStatus: getTaskUiStatus(varietyId, nextTask, nextQueue),
+            },
+          },
+        },
+      };
+    });
+  }
+
   async function processQueueInternal(queueOverride?: QueuedOperation[]) {
     const queue = queueOverride || stateRef.current.syncQueue;
     for (const item of queue) {
@@ -313,23 +443,31 @@ export function V2AppProvider({ children }: { children: ReactNode }) {
       }
 
       try {
-        setState((current) => {
-          const baseQueue = queueOverride || current.syncQueue;
-          return {
-            ...current,
-            syncQueue: baseQueue.map((entry) =>
-              entry.id === item.id
-                ? { ...entry, status: 'processing', updatedAt: new Date().toISOString() }
-                : entry,
-            ),
-          };
-        });
+        setState((current) => ({
+          ...current,
+          syncQueue: current.syncQueue.map((entry) =>
+            entry.id === item.id
+              ? ({
+                  ...entry,
+                  status: 'processing',
+                  updatedAt: new Date().toISOString(),
+                } satisfies QueuedOperation)
+              : entry,
+          ),
+        }));
+
+        if (
+          item.type === 'write_sheet' &&
+          (item.payload as Record<string, unknown>).kind === 'disease_card'
+        ) {
+          await processDiseaseCardOperation(item);
+          continue;
+        }
 
         await new Promise((resolve) => setTimeout(resolve, 50));
 
         setState((current) => {
-          const baseQueue = queueOverride || current.syncQueue;
-          const nextQueue: QueuedOperation[] = baseQueue.map((entry) =>
+          const nextQueue: QueuedOperation[] = current.syncQueue.map((entry) =>
             entry.id === item.id
               ? ({
                   ...entry,
@@ -357,32 +495,77 @@ export function V2AppProvider({ children }: { children: ReactNode }) {
           };
         });
       } catch (error) {
-        setState((current) => ({
-          ...current,
-          syncQueue: current.syncQueue.map((entry) =>
+        setState((current) => {
+          const payload = item.payload as Record<string, unknown>;
+          const taskCode = String(payload.taskCode || item.screenId || '');
+          const cardId = payload.cardId ? String(payload.cardId) : undefined;
+          const nextQueue: QueuedOperation[] = current.syncQueue.map((entry) =>
             entry.id === item.id
-              ? {
+              ? ({
                   ...entry,
                   status: 'failed',
                   retryCount: entry.retryCount + 1,
                   updatedAt: new Date().toISOString(),
                   lastError:
                     error instanceof Error ? error.message : v2Copy.localSyncError,
-                }
+                } satisfies QueuedOperation)
               : entry,
-          ),
-          catalog: current.catalog.map((variety) =>
-            variety.id === item.varietyId
+          );
+
+          return {
+            ...current,
+            syncQueue: nextQueue,
+            catalog: current.catalog.map((variety) =>
+              variety.id === item.varietyId
+                ? {
+                    ...variety,
+                    status: 'error',
+                    updatedAt: new Date().toISOString(),
+                    lastError:
+                      error instanceof Error ? error.message : v2Copy.localSyncError,
+                  }
+                : variety,
+            ),
+            inspections: item.varietyId && taskCode
               ? {
-                  ...variety,
-                  status: 'error',
-                  updatedAt: new Date().toISOString(),
-                  lastError:
-                    error instanceof Error ? error.message : v2Copy.localSyncError,
+                  ...current.inspections,
+                  [item.varietyId]: {
+                    ...current.inspections[item.varietyId],
+                    [taskCode]: {
+                      ...(current.inspections[item.varietyId]?.[taskCode] ||
+                        createTaskFromDefinition(item.varietyId, taskCode, nextQueue)),
+                      cards: (current.inspections[item.varietyId]?.[taskCode]?.cards || []).map((card) =>
+                        card.id === cardId
+                          ? {
+                              ...card,
+                              syncStatus: 'failed',
+                              queuedOperationId: item.id,
+                            }
+                          : card,
+                      ),
+                      uiStatus: getTaskUiStatus(
+                        item.varietyId,
+                        {
+                          ...(current.inspections[item.varietyId]?.[taskCode] ||
+                            createTaskFromDefinition(item.varietyId, taskCode, nextQueue)),
+                          cards: (current.inspections[item.varietyId]?.[taskCode]?.cards || []).map((card) =>
+                            card.id === cardId
+                              ? {
+                                  ...card,
+                                  syncStatus: 'failed',
+                                  queuedOperationId: item.id,
+                                }
+                              : card,
+                          ),
+                        },
+                        nextQueue,
+                      ),
+                    },
+                  },
                 }
-              : variety,
-          ),
-        }));
+              : current.inspections,
+          };
+        });
       }
     }
   }
@@ -433,7 +616,7 @@ export function V2AppProvider({ children }: { children: ReactNode }) {
       const nextQueue = stripTaskQueueEntries(current.syncQueue, varietyId, taskCode);
       const draftTask: InspectionTask = {
         ...nextTask,
-        completedAt: undefined,
+        completedAt: nextTask.flowKind === 'disease_cards' ? nextTask.completedAt : undefined,
         updatedAt: new Date().toISOString(),
       };
 
@@ -484,6 +667,7 @@ export function V2AppProvider({ children }: { children: ReactNode }) {
           title,
           source: 'linked',
           binding: buildLocalBinding(varietyId, title, 'linked', raw),
+          setup: createWorkbookSetup(varietyId),
           createdAt: now,
           updatedAt: now,
           status: 'ready',
@@ -585,6 +769,7 @@ export function V2AppProvider({ children }: { children: ReactNode }) {
               '2': draft.plots['2'].photoUri,
               '3': draft.plots['3'].photoUri,
             },
+            ...createWorkbookSetup(varietyId, draft),
           },
           createdAt: now,
           updatedAt: now,
@@ -652,6 +837,7 @@ export function V2AppProvider({ children }: { children: ReactNode }) {
           id: createId('card'),
           note: '',
           isComplete: false,
+          syncStatus: currentTask.flowKind === 'disease_cards' ? 'draft' : undefined,
         };
         saveDraftTask(varietyId, taskCode, {
           ...currentTask,
@@ -667,45 +853,145 @@ export function V2AppProvider({ children }: { children: ReactNode }) {
             if (card.id !== cardId) {
               return card;
             }
-            if (card.isComplete && !('isComplete' in changes)) {
+            if (
+              (currentTask.flowKind === 'disease_cards' && isLockedDiseaseCard(card)) ||
+              (card.isComplete && !('isComplete' in changes))
+            ) {
               return card;
             }
 
             const nextCard = { ...card, ...changes };
             return {
               ...nextCard,
-              isComplete: isMeasurement
-                ? isMeasurementCardComplete(nextCard)
-                : isInfectionCardComplete(nextCard),
+              isComplete:
+                currentTask.flowKind === 'disease_cards'
+                  ? isDiseaseCardComplete(nextCard) && !isDraftDiseaseCard(nextCard)
+                  : isMeasurement
+                    ? isMeasurementCardComplete(nextCard)
+                    : false,
             };
           }),
         });
       },
-      completeTaskCard(varietyId, taskCode, cardId) {
+      async completeTaskCard(varietyId, taskCode, cardId) {
         const currentTask = getTaskInternal(varietyId, taskCode);
+        const currentCard = currentTask.cards.find((card) => card.id === cardId);
+        if (!currentCard) {
+          throw new Error(v2Copy.localSyncError);
+        }
+
+        if (currentTask.flowKind === 'disease_cards') {
+          if (!currentCard.photoUri) {
+            throw new Error(v2Copy.taskDiseasePhotoRequired);
+          }
+          if (!currentCard.rowNumber?.trim()) {
+            throw new Error(v2Copy.taskDiseaseRowRequired);
+          }
+          if (!currentCard.plot) {
+            throw new Error(v2Copy.taskDiseasePlotRequired);
+          }
+          if (!currentCard.capturedAt || !currentCard.capturedLocation?.mapsUrl) {
+            throw new Error(v2Copy.taskDiseaseLocationRequired);
+          }
+          const taskDef = taskDefinitionsByCode[taskCode];
+          if (!taskDef?.logicalSheetKey) {
+            throw new Error(v2Copy.localSyncError);
+          }
+
+          const now = new Date().toISOString();
+          const operation: QueuedOperation = {
+            id: createId('queue'),
+            type: 'write_sheet',
+            varietyId,
+            screenId: taskCode,
+            status: 'queued',
+            idempotencyKey: `${varietyId}:${taskCode}:${cardId}:${now}`,
+            createdAt: now,
+            updatedAt: now,
+            retryCount: 0,
+            payload: {
+              kind: 'disease_card',
+              logicalSheetKey: taskDef.logicalSheetKey,
+              taskCode,
+              cardId,
+              plot: currentCard.plot,
+              rowNumber: currentCard.rowNumber,
+              plantNumber: currentCard.plantNumber,
+              photoUri: currentCard.photoUri,
+              capturedAt: currentCard.capturedAt,
+              capturedLocation: currentCard.capturedLocation,
+            },
+            media: currentCard.photoUri
+              ? [{ localUri: currentCard.photoUri, mimeType: 'image/jpeg' }]
+              : [],
+          };
+
+          const nextQueue = [operation, ...stateRef.current.syncQueue];
+          const nextTask: InspectionTask = {
+            ...currentTask,
+            completedAt: currentTask.completedAt || now,
+            updatedAt: now,
+            cardsCompleted: true,
+            cards: currentTask.cards.map((card) =>
+              card.id === cardId
+                ? {
+                    ...card,
+                    note: card.note || currentTask.title,
+                    isComplete: true,
+                    syncStatus: 'queued',
+                    queuedOperationId: operation.id,
+                  }
+                : card,
+            ),
+          };
+
+          setState((current) => ({
+            ...current,
+            syncQueue: nextQueue,
+            catalog: current.catalog.map((item) =>
+              item.id === varietyId
+                ? { ...item, status: 'syncing', updatedAt: now }
+                : item,
+            ),
+            inspections: {
+              ...current.inspections,
+              [varietyId]: {
+                ...current.inspections[varietyId],
+                [taskCode]: {
+                  ...nextTask,
+                  uiStatus: getTaskUiStatus(varietyId, nextTask, nextQueue),
+                },
+              },
+            },
+          }));
+          await processQueueInternal(nextQueue);
+          return;
+        }
+
         saveDraftTask(varietyId, taskCode, {
           ...currentTask,
-          cards: currentTask.cards.map((card) => {
-            if (card.id !== cardId) {
-              return card;
-            }
-            if (currentTask.flowKind === 'infection_split' && !isInfectionCardComplete(card)) {
-              throw new Error(v2Copy.taskInfectionCardsRequired);
-            }
-            if (currentTask.flowKind === 'measurement_cards' && !isMeasurementCardComplete(card)) {
-              throw new Error(v2Copy.taskMeasurementRequired);
-            }
-
-            return {
-              ...card,
-              note: card.note || currentTask.title,
-              isComplete: true,
-            };
-          }),
+          cards: currentTask.cards.map((card) =>
+            card.id === cardId
+              ? {
+                  ...card,
+                  note: card.note || currentTask.title,
+                  isComplete: currentTask.flowKind === 'measurement_cards'
+                    ? isMeasurementCardComplete(card)
+                    : card.isComplete,
+                }
+              : card,
+          ),
         });
       },
       removeTaskCard(varietyId, taskCode, cardId) {
         const currentTask = getTaskInternal(varietyId, taskCode);
+        const target = currentTask.cards.find((card) => card.id === cardId);
+        if (!target) {
+          return;
+        }
+        if (currentTask.flowKind === 'disease_cards' && isLockedDiseaseCard(target)) {
+          return;
+        }
         saveDraftTask(varietyId, taskCode, {
           ...currentTask,
           cards: currentTask.cards.filter((card) => card.id !== cardId),
@@ -714,11 +1000,8 @@ export function V2AppProvider({ children }: { children: ReactNode }) {
       completeTaskLocally(varietyId, taskCode) {
         const currentTask = getTaskInternal(varietyId, taskCode);
 
-        if (currentTask.flowKind === 'infection_split') {
-          if (!currentTask.overviewCompleted) {
-            throw new Error(v2Copy.taskOverviewStepRequired);
-          }
-          if (!currentTask.cards.length || !currentTask.cards.every((card) => card.isComplete)) {
+        if (currentTask.flowKind === 'disease_cards') {
+          if (!currentTask.cards.length || currentTask.cards.some((card) => isDraftDiseaseCard(card))) {
             throw new Error(v2Copy.taskInfectionCardsRequired);
           }
         } else if (currentTask.flowKind === 'measurement_cards') {
@@ -735,14 +1018,7 @@ export function V2AppProvider({ children }: { children: ReactNode }) {
         saveTask(
           varietyId,
           taskCode,
-          finalizeTask(
-            varietyId,
-            {
-              ...currentTask,
-              cardsCompleted: currentTask.cards.length > 0,
-            },
-            nextQueue,
-          ),
+          finalizeTask(varietyId, currentTask, nextQueue),
           nextQueue,
         );
       },
@@ -771,11 +1047,7 @@ export function V2AppProvider({ children }: { children: ReactNode }) {
             taskCode,
             title: task.title,
           },
-          writes: templateService.buildTaskWrites(
-            variety,
-            task,
-            variety.setup?.mapsUrl,
-          ),
+          writes: templateService.buildTaskWrites(variety, task, variety.setup?.mapsUrl, stateRef.current.session?.email),
           media: [
             ...(task.overviewPhotoUri
               ? [{ localUri: task.overviewPhotoUri, mimeType: 'image/jpeg' as const }]
@@ -794,28 +1066,25 @@ export function V2AppProvider({ children }: { children: ReactNode }) {
           ...stripTaskQueueEntries(stateRef.current.syncQueue, varietyId, taskCode),
         ];
 
-        setState((current) => {
-
-          return {
-            ...current,
-            syncQueue: nextQueue,
-            catalog: current.catalog.map((item) =>
-              item.id === varietyId
-                ? { ...item, status: 'syncing', updatedAt: new Date().toISOString() }
-                : item,
-            ),
-            inspections: {
-              ...current.inspections,
-              [varietyId]: {
-                ...current.inspections[varietyId],
-                [taskCode]: {
-                  ...task,
-                  uiStatus: getTaskUiStatus(varietyId, task, nextQueue),
-                },
+        setState((current) => ({
+          ...current,
+          syncQueue: nextQueue,
+          catalog: current.catalog.map((item) =>
+            item.id === varietyId
+              ? { ...item, status: 'syncing', updatedAt: new Date().toISOString() }
+              : item,
+          ),
+          inspections: {
+            ...current.inspections,
+            [varietyId]: {
+              ...current.inspections[varietyId],
+              [taskCode]: {
+                ...task,
+                uiStatus: getTaskUiStatus(varietyId, task, nextQueue),
               },
             },
-          };
-        });
+          },
+        }));
 
         await processQueueInternal(nextQueue);
       },

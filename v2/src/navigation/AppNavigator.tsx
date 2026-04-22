@@ -7,12 +7,10 @@ import { v2Copy } from '../config/copy';
 import { useV2App } from '../context/V2AppContext';
 import { CatalogScreen, VarietyScreen } from '../screens/CatalogScreens';
 import { CreationScreen } from '../screens/CreationScreen';
-import { PlaceholderRoleScreen } from '../screens/PlaceholderRoleScreen';
 import { QueueScreen } from '../screens/QueueScreen';
 import { AuthScreen, StartScreen } from '../screens/StartScreens';
 import {
   FusariumCardsScreen,
-  FusariumOverviewScreen,
   MeasurementTaskScreen,
   ObservationTaskScreen,
   PendingTaskScreen,
@@ -36,13 +34,11 @@ export function V2AppNavigator() {
         <Stack.Screen name="Catalog" component={CatalogScreen} />
         <Stack.Screen name="Creation" component={CreationScreen} />
         <Stack.Screen name="Variety" component={VarietyScreen} />
-        <Stack.Screen name="FusariumOverview" component={FusariumOverviewScreen} />
         <Stack.Screen name="FusariumCards" component={FusariumCardsScreen} />
         <Stack.Screen name="ObservationTask" component={ObservationTaskScreen} />
         <Stack.Screen name="MeasurementTask" component={MeasurementTaskScreen} />
         <Stack.Screen name="PendingTask" component={PendingTaskScreen} />
         <Stack.Screen name="Queue" component={QueueScreen} />
-        <Stack.Screen name="PlaceholderRole" component={PlaceholderRoleScreen} />
       </Stack.Navigator>
     </NavigationContainer>
   );

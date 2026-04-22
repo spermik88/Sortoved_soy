@@ -31,10 +31,7 @@ export function CatalogScreen({
             />
           ))
         ) : (
-          <EmptyState
-            title={v2Copy.catalogEmptyTitle}
-            description={v2Copy.catalogEmptyBody}
-          />
+          <EmptyState title={v2Copy.catalogEmptyTitle} description={v2Copy.catalogEmptyBody} />
         )}
         <Button
           label={v2Copy.catalogAdd}
@@ -58,14 +55,14 @@ export function VarietyScreen({
   }
 
   const openTask = (taskCode: string) => {
-    if (taskCode === '1') {
-      navigation.navigate('FusariumOverview', { varietyId: variety.id, taskCode });
-      return;
-    }
-
     const taskDef = taskDefinitions.find((item) => item.code === taskCode);
     if (!taskDef) {
       Alert.alert(v2Copy.errorTitle, v2Copy.stepNotFound);
+      return;
+    }
+
+    if (taskDef.flowKind === 'disease_cards') {
+      navigation.navigate('FusariumCards', { varietyId: variety.id, taskCode });
       return;
     }
 
@@ -128,7 +125,7 @@ export function VarietyScreen({
           return (
             <Button
               key={task.code}
-              label={`${task.code}. ${task.title} — ${getTaskStatusLabel(draft)}`}
+              label={`${task.code}. ${task.title} - ${getTaskStatusLabel(draft)}`}
               variant="secondary"
               onPress={() => openTask(task.code)}
             />
