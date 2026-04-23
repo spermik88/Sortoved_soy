@@ -1,5 +1,5 @@
 import React from 'react';
-import { Alert, Text, View } from 'react-native';
+import { Alert, ScrollView, Text, View } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import {
@@ -11,13 +11,21 @@ import {
   Title,
   uiStyles,
 } from '../components/Ui';
+import { carouselRegistry } from '../config/carouselRegistry';
 import { v2Copy } from '../config/copy';
 import { taskDefinitionsByCode } from '../config/flowRegistry';
 import { useV2App } from '../context/V2AppContext';
 import { V2RootStackParamList } from '../navigation/types';
 import { locationService } from '../services/locationService';
 import { mediaCaptureService } from '../services/mediaCaptureService';
-import { InspectionCardDraft } from '../types/app';
+import {
+  ChoicePlotDraft,
+  InspectionCardDraft,
+  PhenologyPlotDraft,
+  ScorePlotDraft,
+  StructurePlantCardDraft,
+  StructureSamplingDraft,
+} from '../types/app';
 
 function useTaskData(varietyId: string, taskCode: string) {
   const ctx = useV2App();
@@ -49,6 +57,10 @@ function TaskHeader({
 function returnToVariety(
   navigation:
     | NativeStackScreenProps<V2RootStackParamList, 'FusariumCards'>['navigation']
+    | NativeStackScreenProps<V2RootStackParamList, 'ChoiceTask'>['navigation']
+    | NativeStackScreenProps<V2RootStackParamList, 'ScoreTask'>['navigation']
+    | NativeStackScreenProps<V2RootStackParamList, 'PhenologyTask'>['navigation']
+    | NativeStackScreenProps<V2RootStackParamList, 'StructureSamplingTask'>['navigation']
     | NativeStackScreenProps<V2RootStackParamList, 'MeasurementTask'>['navigation']
     | NativeStackScreenProps<V2RootStackParamList, 'ObservationTask'>['navigation']
     | NativeStackScreenProps<V2RootStackParamList, 'PendingTask'>['navigation'],
@@ -82,6 +94,79 @@ function isLockedDiseaseCard(card: InspectionCardDraft) {
 
 function captureTimestamp() {
   return new Date().toISOString();
+}
+
+function getPhenologyStatusLabel(plot: PhenologyPlotDraft) {
+  if (plot.isComplete) {
+    return 'Готово';
+  }
+  if (plot.photoUri || plot.confirmed) {
+    return 'Черновик';
+  }
+  return 'Не начато';
+}
+
+function getScoreStatusLabel(plot: ScorePlotDraft) {
+  if (plot.isComplete) {
+    return 'Готово';
+  }
+  if (plot.photoUri || plot.selectedScore) {
+    return 'Черновик';
+  }
+  return 'Не начато';
+}
+
+function getSamplingStatusLabel(sampling: StructureSamplingDraft) {
+  if (sampling.isComplete) {
+    return 'Готово';
+  }
+  if (sampling.plot || sampling.cards.length) {
+    return 'Черновик';
+  }
+  return 'Не начато';
+}
+
+function getStructureCardStatusLabel(card: StructurePlantCardDraft) {
+  return card.isComplete ? 'Готово' : 'Черновик';
+}
+
+function TaskSamples({ taskCode }: { taskCode: string }) {
+  const [expanded, setExpanded] = React.useState(false);
+  const entry = carouselRegistry[taskCode];
+
+  return (
+    <Card>
+      <Button
+        label={expanded ? 'Скрыть образцы' : 'Показать образцы'}
+        variant="secondary"
+        onPress={() => setExpanded((current) => !current)}
+      />
+      {expanded ? (
+        entry?.available && entry.imageSources.length ? (
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 12 }}>
+            {entry.imageSources.map((source, index) => (
+              <View key={`${entry.assetGroupKey}-${index}`} style={{ width: 220, gap: 8 }}>
+                <PhotoFrame uri={source} fallback="Изображение недоступно" />
+                <Text style={uiStyles.paragraph}>{`${index + 1}/${entry.imageSources.length}`}</Text>
+              </View>
+            ))}
+          </ScrollView>
+        ) : (
+          <Text style={uiStyles.paragraph}>Образцы скоро</Text>
+        )
+      ) : null}
+    </Card>
+  );
+}
+
+function getChoiceStatusLabel(plot: ChoicePlotDraft) {
+  if (plot.isComplete) {
+    return 'Готово';
+  }
+  if (plot.photoUri || plot.selectedValue) {
+    return 'Черновик';
+  }
+  return 'Не начато';
 }
 
 export function FusariumCardsScreen({
@@ -152,7 +237,7 @@ export function FusariumCardsScreen({
           return (
             <View key={card.id} style={{ gap: 8, paddingBottom: 16 }}>
               <Text style={uiStyles.paragraph}>
-                {v2Copy.taskCard} {index + 1} • {getDiseaseCardStatusLabel(card)}
+                {v2Copy.taskCard} {index + 1} - {getDiseaseCardStatusLabel(card)}
               </Text>
               <PhotoFrame uri={card.photoUri} fallback={v2Copy.taskCardPhotoMissing} />
               <Button
@@ -222,6 +307,521 @@ export function FusariumCardsScreen({
           variant="secondary"
           onPress={() => returnToVariety(navigation, variety.id)}
         />
+        <Button label={v2Copy.back} variant="ghost" onPress={() => navigation.goBack()} />
+      </Card>
+    </Screen>
+  );
+}
+
+export function PhenologyTaskScreen({
+  route,
+  navigation,
+}: NativeStackScreenProps<V2RootStackParamList, 'PhenologyTask'>) {
+  const {
+    variety,
+    task,
+    taskDef,
+    updatePhenologyPlot,
+    completeTaskLocally,
+    queueTaskSubmission,
+  } = useTaskData(route.params.varietyId, route.params.taskCode);
+
+  if (!variety || !taskDef || !task.phenologyPlots) {
+    return null;
+  }
+
+  const locked = Boolean(task.completedAt);
+
+  const capturePlotPhoto = async (plot: '1' | '2' | '3') => {
+    const result = await mediaCaptureService.capturePhoto();
+    if (result.kind !== 'success') {
+      return;
+    }
+
+    try {
+      const location = await locationService.getCurrentLocation();
+      updatePhenologyPlot(variety.id, task.code, plot, {
+        photoUri: result.uri,
+        capturedAt: captureTimestamp(),
+        capturedLocation: location,
+      });
+    } catch (error) {
+      Alert.alert(
+        v2Copy.errorTitle,
+        error instanceof Error ? error.message : v2Copy.taskDiseaseLocationRequired,
+      );
+    }
+  };
+
+  const saveStep = async () => {
+    try {
+      completeTaskLocally(variety.id, task.code);
+      await queueTaskSubmission(variety.id, task.code);
+      Alert.alert(v2Copy.doneTitle, v2Copy.taskQueuedDone);
+      returnToVariety(navigation, variety.id);
+    } catch (error) {
+      Alert.alert(
+        v2Copy.errorTitle,
+        error instanceof Error ? error.message : v2Copy.completeStepFailed,
+      );
+    }
+  };
+
+  return (
+    <Screen>
+      <TaskHeader
+        title={task.title}
+        subtitle={variety.title}
+        intro={task.intro || ''}
+      />
+      <Card>
+        <Text style={uiStyles.paragraph}>{taskDef.criterionText || ''}</Text>
+        {locked ? (
+          <Text style={uiStyles.paragraph}>Шаг сохранен и доступен только для просмотра.</Text>
+        ) : null}
+      </Card>
+      <Card>
+        {(['1', '2', '3'] as const).map((plot) => {
+          const plotState = task.phenologyPlots?.[plot];
+          if (!plotState) {
+            return null;
+          }
+
+          return (
+            <View key={plot} style={{ gap: 8, paddingBottom: 16 }}>
+              <Text style={uiStyles.paragraph}>
+                {v2Copy.taskPlot} {plot} - {getPhenologyStatusLabel(plotState)}
+              </Text>
+              <PhotoFrame uri={plotState.photoUri} fallback={v2Copy.taskOverviewMissing} />
+              <Button
+                label={plotState.photoUri ? v2Copy.taskRetakeCardPhoto : v2Copy.taskTakeCardPhoto}
+                variant="secondary"
+                disabled={locked}
+                onPress={() => void capturePlotPhoto(plot)}
+              />
+              <Button
+                label={
+                  plotState.confirmed ? 'Критерий подтвержден' : `Подтвердить: ${taskDef.criterionText}`
+                }
+                variant={plotState.confirmed ? 'secondary' : 'primary'}
+                disabled={locked}
+                onPress={() =>
+                  updatePhenologyPlot(variety.id, task.code, plot, {
+                    confirmed: !plotState.confirmed,
+                  })
+                }
+              />
+            </View>
+          );
+        })}
+        {!locked ? (
+          <Button label={v2Copy.completeStep} onPress={() => void saveStep()} />
+        ) : (
+          <Button
+            label={v2Copy.returnToVariety}
+            variant="secondary"
+            onPress={() => returnToVariety(navigation, variety.id)}
+          />
+        )}
+        <Button label={v2Copy.back} variant="ghost" onPress={() => navigation.goBack()} />
+      </Card>
+    </Screen>
+  );
+}
+
+export function ChoiceTaskScreen({
+  route,
+  navigation,
+}: NativeStackScreenProps<V2RootStackParamList, 'ChoiceTask'>) {
+  const {
+    variety,
+    task,
+    taskDef,
+    updateChoicePlot,
+    completeTaskLocally,
+    queueTaskSubmission,
+  } = useTaskData(route.params.varietyId, route.params.taskCode);
+
+  if (!variety || !taskDef || !task.choicePlots) {
+    return null;
+  }
+
+  const locked = Boolean(task.completedAt);
+
+  const capturePlotPhoto = async (plot: '1' | '2' | '3') => {
+    const result = await mediaCaptureService.capturePhoto();
+    if (result.kind !== 'success') {
+      return;
+    }
+
+    try {
+      const location = await locationService.getCurrentLocation();
+      updateChoicePlot(variety.id, task.code, plot, {
+        photoUri: result.uri,
+        capturedAt: captureTimestamp(),
+        capturedLocation: location,
+      });
+    } catch (error) {
+      Alert.alert(
+        v2Copy.errorTitle,
+        error instanceof Error ? error.message : v2Copy.taskDiseaseLocationRequired,
+      );
+    }
+  };
+
+  const saveStep = async () => {
+    try {
+      completeTaskLocally(variety.id, task.code);
+      await queueTaskSubmission(variety.id, task.code);
+      Alert.alert(v2Copy.doneTitle, v2Copy.taskQueuedDone);
+      returnToVariety(navigation, variety.id);
+    } catch (error) {
+      Alert.alert(
+        v2Copy.errorTitle,
+        error instanceof Error ? error.message : v2Copy.completeStepFailed,
+      );
+    }
+  };
+
+  return (
+    <Screen>
+      <TaskHeader title={task.title} subtitle={variety.title} intro={task.intro || ''} />
+      <TaskSamples taskCode={task.code} />
+      <Card>
+        <Text style={uiStyles.paragraph}>
+          {taskDef.photoHint || 'Сделайте фото признака крупным планом.'}
+        </Text>
+        {locked ? (
+          <Text style={uiStyles.paragraph}>
+            Шаг сохранен и доступен только для просмотра.
+          </Text>
+        ) : null}
+      </Card>
+      <Card>
+        {(['1', '2', '3'] as const).map((plot) => {
+          const plotState = task.choicePlots?.[plot];
+          if (!plotState) {
+            return null;
+          }
+
+          return (
+            <View key={plot} style={{ gap: 8, paddingBottom: 16 }}>
+              <Text style={uiStyles.paragraph}>
+                {v2Copy.taskPlot} {plot} - {getChoiceStatusLabel(plotState)}
+              </Text>
+              <PhotoFrame uri={plotState.photoUri} fallback={v2Copy.taskOverviewMissing} />
+              <Button
+                label={plotState.photoUri ? v2Copy.taskRetakeCardPhoto : v2Copy.taskTakeCardPhoto}
+                variant="secondary"
+                disabled={locked}
+                onPress={() => void capturePlotPhoto(plot)}
+              />
+              <View style={{ gap: 8 }}>
+                {(taskDef.options || []).map((option) => (
+                  <Button
+                    key={option}
+                    label={option}
+                    variant={plotState.selectedValue === option ? 'primary' : 'secondary'}
+                    disabled={locked}
+                    onPress={() =>
+                      updateChoicePlot(variety.id, task.code, plot, {
+                        selectedValue: option,
+                      })
+                    }
+                  />
+                ))}
+              </View>
+            </View>
+          );
+        })}
+        {!locked ? (
+          <Button label={v2Copy.completeStep} onPress={() => void saveStep()} />
+        ) : (
+          <Button
+            label={v2Copy.returnToVariety}
+            variant="secondary"
+            onPress={() => returnToVariety(navigation, variety.id)}
+          />
+        )}
+        <Button label={v2Copy.back} variant="ghost" onPress={() => navigation.goBack()} />
+      </Card>
+    </Screen>
+  );
+}
+
+export function ScoreTaskScreen({
+  route,
+  navigation,
+}: NativeStackScreenProps<V2RootStackParamList, 'ScoreTask'>) {
+  const {
+    variety,
+    task,
+    taskDef,
+    updateScorePlot,
+    completeTaskLocally,
+    queueTaskSubmission,
+  } = useTaskData(route.params.varietyId, route.params.taskCode);
+
+  if (!variety || !taskDef || !task.scorePlots) {
+    return null;
+  }
+
+  const locked = Boolean(task.completedAt);
+
+  const capturePlotPhoto = async (plot: '1' | '2' | '3') => {
+    const result = await mediaCaptureService.capturePhoto();
+    if (result.kind !== 'success') {
+      return;
+    }
+
+    try {
+      const location = await locationService.getCurrentLocation();
+      updateScorePlot(variety.id, task.code, plot, {
+        photoUri: result.uri,
+        capturedAt: captureTimestamp(),
+        capturedLocation: location,
+      });
+    } catch (error) {
+      Alert.alert(
+        v2Copy.errorTitle,
+        error instanceof Error ? error.message : v2Copy.taskDiseaseLocationRequired,
+      );
+    }
+  };
+
+  const saveStep = async () => {
+    try {
+      completeTaskLocally(variety.id, task.code);
+      await queueTaskSubmission(variety.id, task.code);
+      Alert.alert(v2Copy.doneTitle, v2Copy.taskQueuedDone);
+      returnToVariety(navigation, variety.id);
+    } catch (error) {
+      Alert.alert(
+        v2Copy.errorTitle,
+        error instanceof Error ? error.message : v2Copy.completeStepFailed,
+      );
+    }
+  };
+
+  return (
+    <Screen>
+      <TaskHeader title={task.title} subtitle={variety.title} intro={task.intro || ''} />
+      <TaskSamples taskCode={task.code} />
+      <Card>
+        <Text style={uiStyles.paragraph}>
+          {taskDef.photoHint || 'Сделайте фото делянки целиком перед выставлением оценки.'}
+        </Text>
+        {locked ? (
+          <Text style={uiStyles.paragraph}>
+            Шаг сохранен и доступен только для просмотра.
+          </Text>
+        ) : null}
+      </Card>
+      <Card>
+        {(['1', '2', '3'] as const).map((plot) => {
+          const plotState = task.scorePlots?.[plot];
+          if (!plotState) {
+            return null;
+          }
+
+          return (
+            <View key={plot} style={{ gap: 8, paddingBottom: 16 }}>
+              <Text style={uiStyles.paragraph}>
+                {v2Copy.taskPlot} {plot} - {getScoreStatusLabel(plotState)}
+              </Text>
+              <PhotoFrame uri={plotState.photoUri} fallback={v2Copy.taskOverviewMissing} />
+              <Button
+                label={plotState.photoUri ? v2Copy.taskRetakeCardPhoto : v2Copy.taskTakeCardPhoto}
+                variant="secondary"
+                disabled={locked}
+                onPress={() => void capturePlotPhoto(plot)}
+              />
+              <View style={{ gap: 8 }}>
+                {(taskDef.scoreOptions || []).map((score) => (
+                  <Button
+                    key={score}
+                    label={score}
+                    variant={plotState.selectedScore === score ? 'primary' : 'secondary'}
+                    disabled={locked}
+                    onPress={() =>
+                      updateScorePlot(variety.id, task.code, plot, {
+                        selectedScore: score,
+                      })
+                    }
+                  />
+                ))}
+              </View>
+            </View>
+          );
+        })}
+        {!locked ? (
+          <Button label={v2Copy.completeStep} onPress={() => void saveStep()} />
+        ) : (
+          <Button
+            label={v2Copy.returnToVariety}
+            variant="secondary"
+            onPress={() => returnToVariety(navigation, variety.id)}
+          />
+        )}
+        <Button label={v2Copy.back} variant="ghost" onPress={() => navigation.goBack()} />
+      </Card>
+    </Screen>
+  );
+}
+
+export function StructureSamplingTaskScreen({
+  route,
+  navigation,
+}: NativeStackScreenProps<V2RootStackParamList, 'StructureSamplingTask'>) {
+  const {
+    variety,
+    task,
+    taskDef,
+    updateSamplingPlot,
+    addSamplingCard,
+    updateSamplingCard,
+    removeSamplingCard,
+    completeTaskLocally,
+    queueTaskSubmission,
+  } = useTaskData(route.params.varietyId, route.params.taskCode);
+
+  if (!variety || !taskDef || !task.samplings) {
+    return null;
+  }
+
+  const locked = Boolean(task.completedAt);
+
+  const captureCardPhoto = async (samplingId: '1' | '2', cardId: string) => {
+    const result = await mediaCaptureService.capturePhoto();
+    if (result.kind !== 'success') {
+      return;
+    }
+
+    try {
+      const location = await locationService.getCurrentLocation();
+      updateSamplingCard(variety.id, task.code, samplingId, cardId, {
+        photoUri: result.uri,
+        capturedAt: captureTimestamp(),
+        capturedLocation: location,
+      });
+    } catch (error) {
+      Alert.alert(
+        v2Copy.errorTitle,
+        error instanceof Error ? error.message : v2Copy.taskDiseaseLocationRequired,
+      );
+    }
+  };
+
+  const saveStep = async () => {
+    try {
+      completeTaskLocally(variety.id, task.code);
+      await queueTaskSubmission(variety.id, task.code);
+      Alert.alert(v2Copy.doneTitle, v2Copy.taskQueuedDone);
+      returnToVariety(navigation, variety.id);
+    } catch (error) {
+      Alert.alert(
+        v2Copy.errorTitle,
+        error instanceof Error ? error.message : v2Copy.completeStepFailed,
+      );
+    }
+  };
+
+  return (
+    <Screen>
+      <TaskHeader title={task.title} subtitle={variety.title} intro={task.intro || ''} />
+      <TaskSamples taskCode={task.code} />
+      <Card>
+        <Text style={uiStyles.paragraph}>{taskDef.photoHint || 'Сделайте фото растения и внесите значение.'}</Text>
+        {locked ? (
+          <Text style={uiStyles.paragraph}>Шаг сохранен и доступен только для просмотра.</Text>
+        ) : null}
+      </Card>
+      <Card>
+        {(['1', '2'] as const).map((samplingId) => {
+          const sampling = task.samplings?.[samplingId];
+          if (!sampling) {
+            return null;
+          }
+
+          return (
+            <View key={samplingId} style={{ gap: 12, paddingBottom: 20 }}>
+              <Text style={uiStyles.paragraph}>
+                {`Выборка ${samplingId} - ${getSamplingStatusLabel(sampling)}`}
+              </Text>
+              <View style={{ flexDirection: 'row', gap: 8 }}>
+                {(['1', '2', '3'] as const).map((plot) => (
+                  <View key={`${samplingId}-${plot}`} style={{ flex: 1 }}>
+                    <Button
+                      label={`Делянка ${plot}`}
+                      variant={sampling.plot === plot ? 'primary' : 'secondary'}
+                      disabled={locked}
+                      onPress={() => updateSamplingPlot(variety.id, task.code, samplingId, plot)}
+                    />
+                  </View>
+                ))}
+              </View>
+              {sampling.cards.map((card, index) => (
+                <View key={card.id} style={{ gap: 8, paddingBottom: 16 }}>
+                  <Text style={uiStyles.paragraph}>
+                    {`Растение ${index + 1} - ${getStructureCardStatusLabel(card)}`}
+                  </Text>
+                  <PhotoFrame uri={card.photoUri} fallback={v2Copy.taskCardPhotoMissing} />
+                  <Button
+                    label={card.photoUri ? v2Copy.taskRetakeCardPhoto : v2Copy.taskTakeCardPhoto}
+                    variant="secondary"
+                    disabled={locked}
+                    onPress={() => void captureCardPhoto(samplingId, card.id)}
+                  />
+                  <Field
+                    label={v2Copy.taskPlantNumber}
+                    value={card.plantNumber || ''}
+                    editable={!locked}
+                    keyboardType="numeric"
+                    onChangeText={(value) =>
+                      updateSamplingCard(variety.id, task.code, samplingId, card.id, {
+                        plantNumber: value,
+                      })
+                    }
+                  />
+                  <Field
+                    label={taskDef.valueLabel || 'Значение'}
+                    value={card.value || ''}
+                    editable={!locked}
+                    keyboardType="numeric"
+                    onChangeText={(value) =>
+                      updateSamplingCard(variety.id, task.code, samplingId, card.id, {
+                        value,
+                      })
+                    }
+                  />
+                  {!locked ? (
+                    <Button
+                      label={v2Copy.taskDeleteCard}
+                      variant="ghost"
+                      onPress={() => removeSamplingCard(variety.id, task.code, samplingId, card.id)}
+                    />
+                  ) : null}
+                </View>
+              ))}
+              {!locked ? (
+                <Button
+                  label={`Добавить растение в выборку ${samplingId}`}
+                  variant="secondary"
+                  onPress={() => addSamplingCard(variety.id, task.code, samplingId)}
+                />
+              ) : null}
+            </View>
+          );
+        })}
+        {!locked ? (
+          <Button label={v2Copy.completeStep} onPress={() => void saveStep()} />
+        ) : (
+          <Button
+            label={v2Copy.returnToVariety}
+            variant="secondary"
+            onPress={() => returnToVariety(navigation, variety.id)}
+          />
+        )}
         <Button label={v2Copy.back} variant="ghost" onPress={() => navigation.goBack()} />
       </Card>
     </Screen>

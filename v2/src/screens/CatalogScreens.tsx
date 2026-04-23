@@ -66,6 +66,26 @@ export function VarietyScreen({
       return;
     }
 
+    if (taskDef.flowKind === 'choice_by_plot') {
+      navigation.navigate('ChoiceTask', { varietyId: variety.id, taskCode });
+      return;
+    }
+
+    if (taskDef.flowKind === 'score_by_plot') {
+      navigation.navigate('ScoreTask', { varietyId: variety.id, taskCode });
+      return;
+    }
+
+    if (taskDef.flowKind === 'phenology_by_plot') {
+      navigation.navigate('PhenologyTask', { varietyId: variety.id, taskCode });
+      return;
+    }
+
+    if (taskDef.flowKind === 'structure_by_sampling') {
+      navigation.navigate('StructureSamplingTask', { varietyId: variety.id, taskCode });
+      return;
+    }
+
     if (taskDef.flowKind === 'measurement_cards') {
       navigation.navigate('MeasurementTask', { varietyId: variety.id, taskCode });
       return;

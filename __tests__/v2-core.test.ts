@@ -5,7 +5,10 @@ import {
   buildDiseaseCellValue,
   findFirstDiseaseRow,
   recountDiseaseCards,
+  resolveChoiceBlockColumns,
   resolveDiseaseBlockColumns,
+  resolvePhenologyBlockColumns,
+  resolveScoreBlockColumns,
   templateService,
 } from '../v2/src/services/templateService';
 import { VarietyCreationDraft } from '../v2/src/types/app';
@@ -151,6 +154,292 @@ describe('v2 core helpers', () => {
     expect(meta).toContain('https://maps.google.com/?q=1,2');
   });
 
+  it('writes phenology plots into a single fixed workbook row', () => {
+    const workbook = templateService.createLocalWorkbookCopy();
+
+    expect(resolvePhenologyBlockColumns('1')).toEqual({
+      confirmation: 0,
+      photo: 1,
+      meta: 2,
+    });
+    expect(resolvePhenologyBlockColumns('2')).toEqual({
+      confirmation: 4,
+      photo: 5,
+      meta: 6,
+    });
+    expect(resolvePhenologyBlockColumns('3')).toEqual({
+      confirmation: 8,
+      photo: 9,
+      meta: 10,
+    });
+
+    const applied = templateService.applyPhenologyStepWrite(
+      workbook,
+      'start_flowering_sheet',
+      {
+        userEmail: 'sample@mail.com',
+        plots: {
+          '1': {
+            plot: '1',
+            confirmed: true,
+            photoUri: 'file:///plot1.jpg',
+            capturedAt: '2026-04-22T08:00:00.000Z',
+            capturedLocation: {
+              latitude: 1,
+              longitude: 2,
+              mapsUrl: 'https://maps.google.com/?q=1,2',
+            },
+            isComplete: true,
+          },
+          '2': {
+            plot: '2',
+            confirmed: true,
+            photoUri: 'file:///plot2.jpg',
+            capturedAt: '2026-04-22T08:05:00.000Z',
+            capturedLocation: {
+              latitude: 3,
+              longitude: 4,
+              mapsUrl: 'https://maps.google.com/?q=3,4',
+            },
+            isComplete: true,
+          },
+          '3': {
+            plot: '3',
+            confirmed: true,
+            photoUri: 'file:///plot3.jpg',
+            capturedAt: '2026-04-22T08:10:00.000Z',
+            capturedLocation: {
+              latitude: 5,
+              longitude: 6,
+              mapsUrl: 'https://maps.google.com/?q=5,6',
+            },
+            isComplete: true,
+          },
+        },
+      },
+    );
+
+    expect(applied.sheetName).toBe('4.Начало цветения');
+    expect(applied.rowIndex).toBe(2);
+    expect(applied.workbook['4.Начало цветения'][2][0]).toBe('да');
+    expect(applied.workbook['4.Начало цветения'][2][1]).toBe('photo_pending_upload');
+    expect(applied.workbook['4.Начало цветения'][2][4]).toBe('да');
+    expect(applied.workbook['4.Начало цветения'][2][5]).toBe('photo_pending_upload');
+    expect(applied.workbook['4.Начало цветения'][2][8]).toBe('да');
+    expect(applied.workbook['4.Начало цветения'][2][9]).toBe('photo_pending_upload');
+    expect(applied.workbook['4.Начало цветения'][2][3]).toBe('');
+    expect(applied.workbook['4.Начало цветения'][2][7]).toBe('');
+    expect(String(applied.workbook['4.Начало цветения'][2][2])).toContain(
+      'sample@mail.com',
+    );
+    expect(String(applied.workbook['4.Начало цветения'][2][6])).toContain(
+      'https://maps.google.com/?q=3,4',
+    );
+    expect(String(applied.workbook['4.Начало цветения'][2][10])).toContain(
+      '22.04.2026',
+    );
+  });
+
+  it('writes choice plots into a single fixed workbook row', () => {
+    const workbook = templateService.createLocalWorkbookCopy();
+
+    expect(resolveChoiceBlockColumns('1')).toEqual({ value: 0, photo: 1, meta: 2 });
+    expect(resolveChoiceBlockColumns('2')).toEqual({ value: 4, photo: 5, meta: 6 });
+    expect(resolveChoiceBlockColumns('3')).toEqual({ value: 8, photo: 9, meta: 10 });
+
+    const applied = templateService.applyChoiceStepWrite(workbook, 'flower_color_sheet', {
+      userEmail: 'sample@mail.com',
+      plots: {
+        '1': {
+          plot: '1',
+          selectedValue: 'Белая',
+          photoUri: 'file:///plot1.jpg',
+          capturedAt: '2026-04-22T08:00:00.000Z',
+          capturedLocation: {
+            latitude: 1,
+            longitude: 2,
+            mapsUrl: 'https://maps.google.com/?q=1,2',
+          },
+          isComplete: true,
+        },
+        '2': {
+          plot: '2',
+          selectedValue: 'Фиолетовая',
+          photoUri: 'file:///plot2.jpg',
+          capturedAt: '2026-04-22T08:05:00.000Z',
+          capturedLocation: {
+            latitude: 3,
+            longitude: 4,
+            mapsUrl: 'https://maps.google.com/?q=3,4',
+          },
+          isComplete: true,
+        },
+        '3': {
+          plot: '3',
+          selectedValue: 'Белая',
+          photoUri: 'file:///plot3.jpg',
+          capturedAt: '2026-04-22T08:10:00.000Z',
+          capturedLocation: {
+            latitude: 5,
+            longitude: 6,
+            mapsUrl: 'https://maps.google.com/?q=5,6',
+          },
+          isComplete: true,
+        },
+      },
+    });
+
+    expect(applied.sheetName).toBe('10.Цветок: окраска');
+    expect(applied.rowIndex).toBe(2);
+    expect(applied.workbook['10.Цветок: окраска'][2][0]).toBe('Белая');
+    expect(applied.workbook['10.Цветок: окраска'][2][1]).toBe('photo_pending_upload');
+    expect(applied.workbook['10.Цветок: окраска'][2][4]).toBe('Фиолетовая');
+    expect(applied.workbook['10.Цветок: окраска'][2][5]).toBe('photo_pending_upload');
+    expect(applied.workbook['10.Цветок: окраска'][2][8]).toBe('Белая');
+    expect(applied.workbook['10.Цветок: окраска'][2][9]).toBe('photo_pending_upload');
+    expect(applied.workbook['10.Цветок: окраска'][2][3]).toBe('');
+    expect(applied.workbook['10.Цветок: окраска'][2][7]).toBe('');
+    expect(String(applied.workbook['10.Цветок: окраска'][2][2])).toContain(
+      'sample@mail.com',
+    );
+  });
+
+  it('writes score plots into a single fixed workbook row', () => {
+    const workbook = templateService.createLocalWorkbookCopy();
+
+    expect(resolveScoreBlockColumns('1')).toEqual({ value: 0, photo: 1, meta: 2 });
+    expect(resolveScoreBlockColumns('2')).toEqual({ value: 4, photo: 5, meta: 6 });
+    expect(resolveScoreBlockColumns('3')).toEqual({ value: 8, photo: 9, meta: 10 });
+
+    const applied = templateService.applyScoreStepWrite(workbook, 'lodging_resistance_sheet', {
+      userEmail: 'sample@mail.com',
+      plots: {
+        '1': {
+          plot: '1',
+          selectedScore: '1',
+          photoUri: 'file:///plot1.jpg',
+          capturedAt: '2026-04-22T08:00:00.000Z',
+          capturedLocation: {
+            latitude: 1,
+            longitude: 2,
+            mapsUrl: 'https://maps.google.com/?q=1,2',
+          },
+          isComplete: true,
+        },
+        '2': {
+          plot: '2',
+          selectedScore: '5',
+          photoUri: 'file:///plot2.jpg',
+          capturedAt: '2026-04-22T08:05:00.000Z',
+          capturedLocation: {
+            latitude: 3,
+            longitude: 4,
+            mapsUrl: 'https://maps.google.com/?q=3,4',
+          },
+          isComplete: true,
+        },
+        '3': {
+          plot: '3',
+          selectedScore: '9',
+          photoUri: 'file:///plot3.jpg',
+          capturedAt: '2026-04-22T08:10:00.000Z',
+          capturedLocation: {
+            latitude: 5,
+            longitude: 6,
+            mapsUrl: 'https://maps.google.com/?q=5,6',
+          },
+          isComplete: true,
+        },
+      },
+    });
+
+    expect(applied.sheetName).toBe('15.Устойчивость к полеганию');
+    expect(applied.rowIndex).toBe(2);
+    expect(applied.workbook['15.Устойчивость к полеганию'][2][0]).toBe('1');
+    expect(applied.workbook['15.Устойчивость к полеганию'][2][1]).toBe(
+      'photo_pending_upload',
+    );
+    expect(applied.workbook['15.Устойчивость к полеганию'][2][4]).toBe('5');
+    expect(applied.workbook['15.Устойчивость к полеганию'][2][5]).toBe(
+      'photo_pending_upload',
+    );
+    expect(applied.workbook['15.Устойчивость к полеганию'][2][8]).toBe('9');
+    expect(applied.workbook['15.Устойчивость к полеганию'][2][9]).toBe(
+      'photo_pending_upload',
+    );
+    expect(applied.workbook['15.Устойчивость к полеганию'][2][3]).toBe('');
+    expect(applied.workbook['15.Устойчивость к полеганию'][2][7]).toBe('');
+    expect(String(applied.workbook['15.Устойчивость к полеганию'][2][10])).toContain(
+      '22.04.2026',
+    );
+  });
+
+  it('writes structure sampling rows into append-only sheets', () => {
+    const workbook = templateService.createLocalWorkbookCopy();
+    const applied = templateService.appendStructureSamplingStepWrite(workbook, 'stem_length_sheet', {
+      userEmail: 'sample@mail.com',
+      samplings: {
+        '1': {
+          samplingId: '1',
+          plot: '2',
+          isComplete: true,
+          cards: [
+            {
+              id: 'card-a',
+              samplingId: '1',
+              plantNumber: '3',
+              value: '87',
+              photoUri: 'file:///a.jpg',
+              capturedAt: '2026-04-22T08:00:00.000Z',
+              capturedLocation: {
+                latitude: 1,
+                longitude: 2,
+                mapsUrl: 'https://maps.google.com/?q=1,2',
+              },
+              isComplete: true,
+            },
+          ],
+        },
+        '2': {
+          samplingId: '2',
+          plot: '3',
+          isComplete: true,
+          cards: [
+            {
+              id: 'card-b',
+              samplingId: '2',
+              plantNumber: '7',
+              value: '92',
+              photoUri: 'file:///b.jpg',
+              capturedAt: '2026-04-22T08:05:00.000Z',
+              capturedLocation: {
+                latitude: 3,
+                longitude: 4,
+                mapsUrl: 'https://maps.google.com/?q=3,4',
+              },
+              isComplete: true,
+            },
+          ],
+        },
+      },
+    });
+
+    expect(applied.sheetName).toBe('17.Длина стебля');
+    expect(applied.rowIndexStart).toBe(2);
+    expect(applied.rowsWritten).toBe(2);
+    expect(applied.workbook['17.Длина стебля'][2][0]).toBe('1');
+    expect(applied.workbook['17.Длина стебля'][2][1]).toBe('2');
+    expect(applied.workbook['17.Длина стебля'][2][2]).toBe('3');
+    expect(applied.workbook['17.Длина стебля'][2][3]).toBe('87');
+    expect(applied.workbook['17.Длина стебля'][2][4]).toBe('photo_pending_upload');
+    expect(String(applied.workbook['17.Длина стебля'][2][5])).toContain('sample@mail.com');
+    expect(applied.workbook['17.Длина стебля'][3][0]).toBe('2');
+    expect(applied.workbook['17.Длина стебля'][3][1]).toBe('3');
+    expect(applied.workbook['17.Длина стебля'][3][2]).toBe('7');
+    expect(applied.workbook['17.Длина стебля'][3][3]).toBe('92');
+    expect(applied.workbook['17.Длина стебля'][3][4]).toBe('photo_pending_upload');
+  });
+
   it('declares all disease steps as disease cards flow', () => {
     expect(taskDefinitionsByCode['1'].flowKind).toBe('disease_cards');
     expect(taskDefinitionsByCode['2'].flowKind).toBe('disease_cards');
@@ -161,6 +450,31 @@ describe('v2 core helpers', () => {
     expect(taskDefinitionsByCode['9'].flowKind).toBe('disease_cards');
     expect(taskDefinitionsByCode['2'].logicalSheetKey).toBe('septoria_sheet');
     expect(taskDefinitionsByCode['9'].logicalSheetKey).toBe('aphid_damage_sheet');
-    expect(taskDefinitionsByCode['17'].flowKind).toBe('measurement_cards');
+    expect(taskDefinitionsByCode['4'].flowKind).toBe('phenology_by_plot');
+    expect(taskDefinitionsByCode['5'].flowKind).toBe('phenology_by_plot');
+    expect(taskDefinitionsByCode['10'].flowKind).toBe('choice_by_plot');
+    expect(taskDefinitionsByCode['11'].flowKind).toBe('phenology_by_plot');
+    expect(taskDefinitionsByCode['12'].flowKind).toBe('choice_by_plot');
+    expect(taskDefinitionsByCode['13'].flowKind).toBe('phenology_by_plot');
+    expect(taskDefinitionsByCode['14'].flowKind).toBe('choice_by_plot');
+    expect(taskDefinitionsByCode['4'].logicalSheetKey).toBe('start_flowering_sheet');
+    expect(taskDefinitionsByCode['10'].logicalSheetKey).toBe('flower_color_sheet');
+    expect(taskDefinitionsByCode['12'].logicalSheetKey).toBe('leaf_shape_sheet');
+    expect(taskDefinitionsByCode['13'].logicalSheetKey).toBe('full_maturity_sheet');
+    expect(taskDefinitionsByCode['14'].logicalSheetKey).toBe(
+      'stem_pubescence_color_sheet',
+    );
+    expect(taskDefinitionsByCode['15'].flowKind).toBe('score_by_plot');
+    expect(taskDefinitionsByCode['16'].flowKind).toBe('score_by_plot');
+    expect(taskDefinitionsByCode['15'].logicalSheetKey).toBe('lodging_resistance_sheet');
+    expect(taskDefinitionsByCode['16'].logicalSheetKey).toBe('shattering_resistance_sheet');
+    expect(taskDefinitionsByCode['10'].hasCarouselSamples).toBe(false);
+    expect(taskDefinitionsByCode['15'].hasCarouselSamples).toBe(false);
+    expect(taskDefinitionsByCode['17'].flowKind).toBe('structure_by_sampling');
+    expect(taskDefinitionsByCode['25'].flowKind).toBe('structure_by_sampling');
+    expect(taskDefinitionsByCode['17'].logicalSheetKey).toBe('stem_length_sheet');
+    expect(taskDefinitionsByCode['25'].logicalSheetKey).toBe('seed_weight_per_plant_sheet');
+    expect(taskDefinitionsByCode['17'].carouselAssetKey).toBe('stem_length');
+    expect(taskDefinitionsByCode['25'].carouselAssetKey).toBe('seed_weight_per_plant');
   });
 });

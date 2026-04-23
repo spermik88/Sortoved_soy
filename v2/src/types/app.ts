@@ -11,9 +11,41 @@ export type DiseaseSheetKey =
   | 'peronosporosis_sheet'
   | 'cercosporosis_sheet'
   | 'aphid_damage_sheet';
+export type ChoiceSheetKey =
+  | 'flower_color_sheet'
+  | 'leaf_shape_sheet'
+  | 'stem_pubescence_color_sheet';
+export type ScoreSheetKey =
+  | 'lodging_resistance_sheet'
+  | 'shattering_resistance_sheet';
+export type StructureSheetKey =
+  | 'stem_length_sheet'
+  | 'lower_pod_attachment_sheet'
+  | 'productive_nodes_sheet'
+  | 'branch_count_sheet'
+  | 'productive_pods_sheet'
+  | 'pods_per_node_sheet'
+  | 'seeds_per_plant_sheet'
+  | 'seeds_per_pod_sheet'
+  | 'seed_weight_per_plant_sheet';
+export type PhenologySheetKey =
+  | 'start_flowering_sheet'
+  | 'full_flowering_sheet'
+  | 'end_flowering_sheet'
+  | 'full_maturity_sheet';
+export type LocalSheetKey =
+  | DiseaseSheetKey
+  | ChoiceSheetKey
+  | ScoreSheetKey
+  | StructureSheetKey
+  | PhenologySheetKey;
 export type TaskFlowKind =
   | 'infection_split'
   | 'disease_cards'
+  | 'choice_by_plot'
+  | 'score_by_plot'
+  | 'structure_by_sampling'
+  | 'phenology_by_plot'
   | 'observation_single'
   | 'measurement_cards'
   | 'placeholder_pending_spec';
@@ -42,7 +74,7 @@ export interface VarietySetupSnapshot {
   plotPhotos?: Partial<Record<'1' | '2' | '3', string>>;
   localWorkbookPath?: string;
   localWorkbook?: Record<string, (string | number | boolean)[][]>;
-  sheetAliases?: Partial<Record<DiseaseSheetKey, string>>;
+  sheetAliases?: Partial<Record<LocalSheetKey, string>>;
 }
 
 export interface VarietyRecord {
@@ -95,6 +127,67 @@ export interface InspectionCardDraft {
   localWorkbookRow?: number;
 }
 
+export interface PhenologyPlotDraft {
+  plot: '1' | '2' | '3';
+  photoUri?: string;
+  confirmed: boolean;
+  capturedAt?: string;
+  capturedLocation?: {
+    latitude: number;
+    longitude: number;
+    mapsUrl: string;
+  };
+  isComplete: boolean;
+}
+
+export interface ChoicePlotDraft {
+  plot: '1' | '2' | '3';
+  photoUri?: string;
+  selectedValue?: string;
+  capturedAt?: string;
+  capturedLocation?: {
+    latitude: number;
+    longitude: number;
+    mapsUrl: string;
+  };
+  isComplete: boolean;
+}
+
+export interface ScorePlotDraft {
+  plot: '1' | '2' | '3';
+  photoUri?: string;
+  selectedScore?: string;
+  capturedAt?: string;
+  capturedLocation?: {
+    latitude: number;
+    longitude: number;
+    mapsUrl: string;
+  };
+  isComplete: boolean;
+}
+
+export interface StructurePlantCardDraft {
+  id: string;
+  samplingId: '1' | '2';
+  photoUri?: string;
+  plantNumber?: string;
+  value?: string;
+  capturedAt?: string;
+  capturedLocation?: {
+    latitude: number;
+    longitude: number;
+    mapsUrl: string;
+  };
+  isComplete: boolean;
+}
+
+export interface StructureSamplingDraft {
+  samplingId: '1' | '2';
+  plot?: '1' | '2' | '3';
+  cards: StructurePlantCardDraft[];
+  isComplete: boolean;
+}
+
 export interface InspectionTask {
   code: string;
   title: string;
@@ -111,6 +204,10 @@ export interface InspectionTask {
   completedAt?: string;
   uiStatus: TaskUiStatus;
   cards: InspectionCardDraft[];
+  phenologyPlots?: Record<'1' | '2' | '3', PhenologyPlotDraft>;
+  choicePlots?: Record<'1' | '2' | '3', ChoicePlotDraft>;
+  scorePlots?: Record<'1' | '2' | '3', ScorePlotDraft>;
+  samplings?: Record<'1' | '2', StructureSamplingDraft>;
   updatedAt: string;
 }
 

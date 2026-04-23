@@ -19,11 +19,21 @@ import { isValidGoogleSheetsUrl } from '../services/sheetsService';
 import { templateService } from '../services/templateService';
 import {
   AuthMode,
+  ChoicePlotDraft,
+  ChoiceSheetKey,
   DiseaseSheetKey,
   InspectionCardDraft,
   InspectionTask,
+  LocalSheetKey,
+  PhenologyPlotDraft,
+  PhenologySheetKey,
   PersistedV2State,
   QueuedOperation,
+  ScorePlotDraft,
+  ScoreSheetKey,
+  StructurePlantCardDraft,
+  StructureSamplingDraft,
+  StructureSheetKey,
   TaskUiStatus,
   VarietyCreationDraft,
   VarietyRecord,
@@ -79,18 +89,32 @@ function createWorkbookSetup(varietyId: string, draft?: VarietyCreationDraft) {
     localWorkbook: templateService.createLocalWorkbookCopy(draft),
     sheetAliases: Object.fromEntries(
       Object.entries(SHEET_ALIASES).map(([key, value]) => [key, value.local]),
-    ) as Partial<Record<DiseaseSheetKey, string>>,
+    ) as Partial<Record<LocalSheetKey, string>>,
   };
+}
+
+function isTaskQueueEntry(item: QueuedOperation, varietyId: string, taskCode: string) {
+  if (item.varietyId !== varietyId || item.screenId !== taskCode) {
+    return false;
+  }
+
+  if (item.type === 'submit_task') {
+    return true;
+  }
+
+  const payload = item.payload as Record<string, unknown>;
+  return (
+    item.type === 'write_sheet' &&
+    (payload.kind === 'phenology_step' ||
+      payload.kind === 'choice_step' ||
+      payload.kind === 'score_step' ||
+      payload.kind === 'structure_sampling_step')
+  );
 }
 
 function getTaskQueueEntries(queue: QueuedOperation[], varietyId: string, taskCode: string) {
   return queue
-    .filter(
-      (item) =>
-        item.type === 'submit_task' &&
-        item.varietyId === varietyId &&
-        item.screenId === taskCode,
-    )
+    .filter((item) => isTaskQueueEntry(item, varietyId, taskCode))
     .sort(
       (left, right) =>
         new Date(right.updatedAt).getTime() - new Date(left.updatedAt).getTime(),
@@ -98,14 +122,7 @@ function getTaskQueueEntries(queue: QueuedOperation[], varietyId: string, taskCo
 }
 
 function stripTaskQueueEntries(queue: QueuedOperation[], varietyId: string, taskCode: string) {
-  return queue.filter(
-    (item) =>
-      !(
-        item.type === 'submit_task' &&
-        item.varietyId === varietyId &&
-        item.screenId === taskCode
-      ),
-  );
+  return queue.filter((item) => !isTaskQueueEntry(item, varietyId, taskCode));
 }
 
 function isDraftDiseaseCard(card: InspectionCardDraft) {
@@ -141,6 +158,98 @@ function getTaskUiStatus(
     return 'ready_local';
   }
 
+  if (task.flowKind === 'phenology_by_plot') {
+    const [taskQueue] = getTaskQueueEntries(queue, varietyId, task.code);
+
+    if (taskQueue?.status === 'synced') {
+      return 'processed';
+    }
+
+    if (taskQueue && ['queued', 'processing', 'failed'].includes(taskQueue.status)) {
+      return 'queued';
+    }
+
+    if (task.completedAt) {
+      return 'ready_local';
+    }
+
+    const plots = task.phenologyPlots ? Object.values(task.phenologyPlots) : [];
+    if (!plots.some((plot) => plot.photoUri || plot.confirmed)) {
+      return 'not_started';
+    }
+
+    return 'draft';
+  }
+
+  if (task.flowKind === 'choice_by_plot') {
+    const [taskQueue] = getTaskQueueEntries(queue, varietyId, task.code);
+
+    if (taskQueue?.status === 'synced') {
+      return 'processed';
+    }
+
+    if (taskQueue && ['queued', 'processing', 'failed'].includes(taskQueue.status)) {
+      return 'queued';
+    }
+
+    if (task.completedAt) {
+      return 'ready_local';
+    }
+
+    const plots = task.choicePlots ? Object.values(task.choicePlots) : [];
+    if (!plots.some((plot) => plot.photoUri || plot.selectedValue)) {
+      return 'not_started';
+    }
+
+    return 'draft';
+  }
+
+  if (task.flowKind === 'score_by_plot') {
+    const [taskQueue] = getTaskQueueEntries(queue, varietyId, task.code);
+
+    if (taskQueue?.status === 'synced') {
+      return 'processed';
+    }
+
+    if (taskQueue && ['queued', 'processing', 'failed'].includes(taskQueue.status)) {
+      return 'queued';
+    }
+
+    if (task.completedAt) {
+      return 'ready_local';
+    }
+
+    const plots = task.scorePlots ? Object.values(task.scorePlots) : [];
+    if (!plots.some((plot) => plot.photoUri || plot.selectedScore)) {
+      return 'not_started';
+    }
+
+    return 'draft';
+  }
+
+  if (task.flowKind === 'structure_by_sampling') {
+    const [taskQueue] = getTaskQueueEntries(queue, varietyId, task.code);
+
+    if (taskQueue?.status === 'synced') {
+      return 'processed';
+    }
+
+    if (taskQueue && ['queued', 'processing', 'failed'].includes(taskQueue.status)) {
+      return 'queued';
+    }
+
+    if (task.completedAt) {
+      return 'ready_local';
+    }
+
+    const samplings = task.samplings ? Object.values(task.samplings) : [];
+    if (!samplings.some((sampling) => sampling.plot || sampling.cards.length)) {
+      return 'not_started';
+    }
+
+    return 'draft';
+  }
+
   const [taskQueue] = getTaskQueueEntries(queue, varietyId, task.code);
 
   if (taskQueue?.status === 'synced') {
@@ -149,6 +258,10 @@ function getTaskUiStatus(
 
   if (taskQueue && ['queued', 'processing'].includes(taskQueue.status)) {
     return 'queued';
+  }
+
+  if (taskQueue?.status === 'failed') {
+    return 'ready_local';
   }
 
   if (task.completedAt) {
@@ -176,6 +289,82 @@ function isMeasurementCardComplete(card: InspectionCardDraft) {
   return Boolean(card.photoUri && card.value?.trim() && card.plot?.trim());
 }
 
+function createEmptyPhenologyPlots(): Record<'1' | '2' | '3', PhenologyPlotDraft> {
+  return {
+    '1': { plot: '1', confirmed: false, isComplete: false },
+    '2': { plot: '2', confirmed: false, isComplete: false },
+    '3': { plot: '3', confirmed: false, isComplete: false },
+  };
+}
+
+function createEmptyChoicePlots(): Record<'1' | '2' | '3', ChoicePlotDraft> {
+  return {
+    '1': { plot: '1', isComplete: false },
+    '2': { plot: '2', isComplete: false },
+    '3': { plot: '3', isComplete: false },
+  };
+}
+
+function createEmptyScorePlots(): Record<'1' | '2' | '3', ScorePlotDraft> {
+  return {
+    '1': { plot: '1', isComplete: false },
+    '2': { plot: '2', isComplete: false },
+    '3': { plot: '3', isComplete: false },
+  };
+}
+
+function createEmptySamplings(): Record<'1' | '2', StructureSamplingDraft> {
+  return {
+    '1': { samplingId: '1', cards: [], isComplete: false },
+    '2': { samplingId: '2', cards: [], isComplete: false },
+  };
+}
+
+function isPhenologyPlotComplete(plot: PhenologyPlotDraft) {
+  return Boolean(
+    plot.photoUri &&
+      plot.confirmed &&
+      plot.capturedAt &&
+      plot.capturedLocation?.mapsUrl,
+  );
+}
+
+function isChoicePlotComplete(plot: ChoicePlotDraft) {
+  return Boolean(
+    plot.photoUri &&
+      plot.selectedValue &&
+      plot.capturedAt &&
+      plot.capturedLocation?.mapsUrl,
+  );
+}
+
+function isScorePlotComplete(plot: ScorePlotDraft) {
+  return Boolean(
+    plot.photoUri &&
+      plot.selectedScore &&
+      plot.capturedAt &&
+      plot.capturedLocation?.mapsUrl,
+  );
+}
+
+function isStructureCardComplete(card: StructurePlantCardDraft) {
+  return Boolean(
+    card.photoUri &&
+      card.plantNumber?.trim() &&
+      card.value?.trim() &&
+      card.capturedAt &&
+      card.capturedLocation?.mapsUrl,
+  );
+}
+
+function isSamplingComplete(sampling: StructureSamplingDraft) {
+  return Boolean(
+    sampling.plot &&
+      sampling.cards.length > 0 &&
+      sampling.cards.every(isStructureCardComplete),
+  );
+}
+
 function isPlaceholderTaskComplete(task: InspectionTask) {
   return Boolean(task.overviewPhotoUri);
 }
@@ -193,6 +382,18 @@ function finalizeTask(
     cardsCompleted:
       task.flowKind === 'measurement_cards'
         ? task.cards.length > 0 && task.cards.every(isMeasurementCardComplete)
+        : task.flowKind === 'phenology_by_plot'
+          ? Boolean(task.phenologyPlots) &&
+            Object.values(task.phenologyPlots || {}).every(isPhenologyPlotComplete)
+        : task.flowKind === 'choice_by_plot'
+          ? Boolean(task.choicePlots) &&
+            Object.values(task.choicePlots || {}).every(isChoicePlotComplete)
+        : task.flowKind === 'score_by_plot'
+          ? Boolean(task.scorePlots) &&
+            Object.values(task.scorePlots || {}).every(isScorePlotComplete)
+        : task.flowKind === 'structure_by_sampling'
+          ? Boolean(task.samplings) &&
+            Object.values(task.samplings || {}).every(isSamplingComplete)
         : task.flowKind === 'disease_cards'
           ? task.cards.length > 0 && task.cards.every((card) => card.syncStatus === 'synced')
           : task.cardsCompleted,
@@ -229,6 +430,11 @@ function createTaskFromDefinition(
     cardsCompleted: false,
     uiStatus: 'not_started',
     cards: [],
+    phenologyPlots:
+      taskDef.flowKind === 'phenology_by_plot' ? createEmptyPhenologyPlots() : undefined,
+    choicePlots: taskDef.flowKind === 'choice_by_plot' ? createEmptyChoicePlots() : undefined,
+    scorePlots: taskDef.flowKind === 'score_by_plot' ? createEmptyScorePlots() : undefined,
+    samplings: taskDef.flowKind === 'structure_by_sampling' ? createEmptySamplings() : undefined,
     updatedAt: new Date().toISOString(),
   };
 
@@ -291,6 +497,44 @@ interface V2ContextValue {
     taskCode: string,
     cardId: string,
     changes: Partial<InspectionCardDraft>,
+  ): void;
+  updatePhenologyPlot(
+    varietyId: string,
+    taskCode: string,
+    plot: '1' | '2' | '3',
+    changes: Partial<PhenologyPlotDraft>,
+  ): void;
+  updateChoicePlot(
+    varietyId: string,
+    taskCode: string,
+    plot: '1' | '2' | '3',
+    changes: Partial<ChoicePlotDraft>,
+  ): void;
+  updateScorePlot(
+    varietyId: string,
+    taskCode: string,
+    plot: '1' | '2' | '3',
+    changes: Partial<ScorePlotDraft>,
+  ): void;
+  updateSamplingPlot(
+    varietyId: string,
+    taskCode: string,
+    samplingId: '1' | '2',
+    plot: '1' | '2' | '3',
+  ): void;
+  addSamplingCard(varietyId: string, taskCode: string, samplingId: '1' | '2'): void;
+  updateSamplingCard(
+    varietyId: string,
+    taskCode: string,
+    samplingId: '1' | '2',
+    cardId: string,
+    changes: Partial<StructurePlantCardDraft>,
+  ): void;
+  removeSamplingCard(
+    varietyId: string,
+    taskCode: string,
+    samplingId: '1' | '2',
+    cardId: string,
   ): void;
   completeTaskCard(varietyId: string, taskCode: string, cardId: string): Promise<void>;
   removeTaskCard(varietyId: string, taskCode: string, cardId: string): void;
@@ -435,6 +679,334 @@ export function V2AppProvider({ children }: { children: ReactNode }) {
     });
   }
 
+  async function processPhenologyStepOperation(item: QueuedOperation) {
+    const payload = item.payload as Record<string, unknown>;
+    const varietyId = item.varietyId;
+    const taskCode = String(payload.taskCode || item.screenId || '');
+    const logicalSheetKey = payload.logicalSheetKey as PhenologySheetKey | undefined;
+    const plots = payload.plots as Record<'1' | '2' | '3', PhenologyPlotDraft> | undefined;
+
+    if (!varietyId || !taskCode || !logicalSheetKey || !plots) {
+      throw new Error(v2Copy.localSyncError);
+    }
+
+    setState((current) => {
+      const variety = current.catalog.find((entry) => entry.id === varietyId);
+      if (!variety) {
+        throw new Error(v2Copy.varietyNotFound);
+      }
+
+      const workbook =
+        variety.setup?.localWorkbook || templateService.createLocalWorkbookCopy();
+      const nextWorkbook = JSON.parse(JSON.stringify(workbook)) as Record<
+        string,
+        (string | number | boolean)[][]
+      >;
+      const applied = templateService.applyPhenologyStepWrite(nextWorkbook, logicalSheetKey, {
+        plots,
+        userEmail: current.session?.email,
+      });
+
+      const nextQueue: QueuedOperation[] = current.syncQueue.map((entry) =>
+        entry.id === item.id
+          ? ({
+              ...entry,
+              status: 'synced',
+              updatedAt: new Date().toISOString(),
+              lastError: undefined,
+            } satisfies QueuedOperation)
+          : entry,
+      );
+
+      const task =
+        current.inspections[varietyId]?.[taskCode] ||
+        createTaskFromDefinition(varietyId, taskCode, nextQueue);
+      const nextTask: InspectionTask = {
+        ...task,
+        phenologyPlots: plots,
+        cardsCompleted: true,
+        completedAt: task.completedAt || new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        uiStatus: 'processed',
+      };
+
+      return {
+        ...current,
+        syncQueue: nextQueue,
+        catalog: current.catalog.map((entry) =>
+          entry.id === varietyId
+            ? {
+                ...entry,
+                status: 'ready',
+                updatedAt: new Date().toISOString(),
+                lastError: undefined,
+                setup: {
+                  ...entry.setup,
+                  localWorkbook: applied.workbook,
+                },
+              }
+            : entry,
+        ),
+        inspections: {
+          ...current.inspections,
+          [varietyId]: {
+            ...current.inspections[varietyId],
+            [taskCode]: {
+              ...nextTask,
+              uiStatus: getTaskUiStatus(varietyId, nextTask, nextQueue),
+            },
+          },
+        },
+      };
+    });
+  }
+
+  async function processChoiceStepOperation(item: QueuedOperation) {
+    const payload = item.payload as Record<string, unknown>;
+    const varietyId = item.varietyId;
+    const taskCode = String(payload.taskCode || item.screenId || '');
+    const logicalSheetKey = payload.logicalSheetKey as ChoiceSheetKey | undefined;
+    const plots = payload.plots as Record<'1' | '2' | '3', ChoicePlotDraft> | undefined;
+
+    if (!varietyId || !taskCode || !logicalSheetKey || !plots) {
+      throw new Error(v2Copy.localSyncError);
+    }
+
+    setState((current) => {
+      const variety = current.catalog.find((entry) => entry.id === varietyId);
+      if (!variety) {
+        throw new Error(v2Copy.varietyNotFound);
+      }
+
+      const workbook =
+        variety.setup?.localWorkbook || templateService.createLocalWorkbookCopy();
+      const nextWorkbook = JSON.parse(JSON.stringify(workbook)) as Record<
+        string,
+        (string | number | boolean)[][]
+      >;
+      const applied = templateService.applyChoiceStepWrite(nextWorkbook, logicalSheetKey, {
+        plots,
+        userEmail: current.session?.email,
+      });
+
+      const nextQueue: QueuedOperation[] = current.syncQueue.map((entry) =>
+        entry.id === item.id
+          ? ({
+              ...entry,
+              status: 'synced',
+              updatedAt: new Date().toISOString(),
+              lastError: undefined,
+            } satisfies QueuedOperation)
+          : entry,
+      );
+
+      const task =
+        current.inspections[varietyId]?.[taskCode] ||
+        createTaskFromDefinition(varietyId, taskCode, nextQueue);
+      const nextTask: InspectionTask = {
+        ...task,
+        choicePlots: plots,
+        cardsCompleted: true,
+        completedAt: task.completedAt || new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        uiStatus: 'processed',
+      };
+
+      return {
+        ...current,
+        syncQueue: nextQueue,
+        catalog: current.catalog.map((entry) =>
+          entry.id === varietyId
+            ? {
+                ...entry,
+                status: 'ready',
+                updatedAt: new Date().toISOString(),
+                lastError: undefined,
+                setup: {
+                  ...entry.setup,
+                  localWorkbook: applied.workbook,
+                },
+              }
+            : entry,
+        ),
+        inspections: {
+          ...current.inspections,
+          [varietyId]: {
+            ...current.inspections[varietyId],
+            [taskCode]: {
+              ...nextTask,
+              uiStatus: getTaskUiStatus(varietyId, nextTask, nextQueue),
+            },
+          },
+        },
+      };
+    });
+  }
+
+  async function processScoreStepOperation(item: QueuedOperation) {
+    const payload = item.payload as Record<string, unknown>;
+    const varietyId = item.varietyId;
+    const taskCode = String(payload.taskCode || item.screenId || '');
+    const logicalSheetKey = payload.logicalSheetKey as ScoreSheetKey | undefined;
+    const plots = payload.plots as Record<'1' | '2' | '3', ScorePlotDraft> | undefined;
+
+    if (!varietyId || !taskCode || !logicalSheetKey || !plots) {
+      throw new Error(v2Copy.localSyncError);
+    }
+
+    setState((current) => {
+      const variety = current.catalog.find((entry) => entry.id === varietyId);
+      if (!variety) {
+        throw new Error(v2Copy.varietyNotFound);
+      }
+
+      const workbook =
+        variety.setup?.localWorkbook || templateService.createLocalWorkbookCopy();
+      const nextWorkbook = JSON.parse(JSON.stringify(workbook)) as Record<
+        string,
+        (string | number | boolean)[][]
+      >;
+      const applied = templateService.applyScoreStepWrite(nextWorkbook, logicalSheetKey, {
+        plots,
+        userEmail: current.session?.email,
+      });
+
+      const nextQueue: QueuedOperation[] = current.syncQueue.map((entry) =>
+        entry.id === item.id
+          ? ({
+              ...entry,
+              status: 'synced',
+              updatedAt: new Date().toISOString(),
+              lastError: undefined,
+            } satisfies QueuedOperation)
+          : entry,
+      );
+
+      const task =
+        current.inspections[varietyId]?.[taskCode] ||
+        createTaskFromDefinition(varietyId, taskCode, nextQueue);
+      const nextTask: InspectionTask = {
+        ...task,
+        scorePlots: plots,
+        cardsCompleted: true,
+        completedAt: task.completedAt || new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        uiStatus: 'processed',
+      };
+
+      return {
+        ...current,
+        syncQueue: nextQueue,
+        catalog: current.catalog.map((entry) =>
+          entry.id === varietyId
+            ? {
+                ...entry,
+                status: 'ready',
+                updatedAt: new Date().toISOString(),
+                lastError: undefined,
+                setup: {
+                  ...entry.setup,
+                  localWorkbook: applied.workbook,
+                },
+              }
+            : entry,
+        ),
+        inspections: {
+          ...current.inspections,
+          [varietyId]: {
+            ...current.inspections[varietyId],
+            [taskCode]: {
+              ...nextTask,
+              uiStatus: getTaskUiStatus(varietyId, nextTask, nextQueue),
+            },
+          },
+        },
+      };
+    });
+  }
+
+  async function processStructureSamplingStepOperation(item: QueuedOperation) {
+    const payload = item.payload as Record<string, unknown>;
+    const varietyId = item.varietyId;
+    const taskCode = String(payload.taskCode || item.screenId || '');
+    const logicalSheetKey = payload.logicalSheetKey as StructureSheetKey | undefined;
+    const samplings = payload.samplings as Record<'1' | '2', StructureSamplingDraft> | undefined;
+
+    if (!varietyId || !taskCode || !logicalSheetKey || !samplings) {
+      throw new Error(v2Copy.localSyncError);
+    }
+
+    setState((current) => {
+      const variety = current.catalog.find((entry) => entry.id === varietyId);
+      if (!variety) {
+        throw new Error(v2Copy.varietyNotFound);
+      }
+
+      const workbook =
+        variety.setup?.localWorkbook || templateService.createLocalWorkbookCopy();
+      const nextWorkbook = JSON.parse(JSON.stringify(workbook)) as Record<
+        string,
+        (string | number | boolean)[][]
+      >;
+      const applied = templateService.appendStructureSamplingStepWrite(nextWorkbook, logicalSheetKey, {
+        samplings,
+        userEmail: current.session?.email,
+      });
+
+      const nextQueue: QueuedOperation[] = current.syncQueue.map((entry) =>
+        entry.id === item.id
+          ? ({
+              ...entry,
+              status: 'synced',
+              updatedAt: new Date().toISOString(),
+              lastError: undefined,
+            } satisfies QueuedOperation)
+          : entry,
+      );
+
+      const task =
+        current.inspections[varietyId]?.[taskCode] ||
+        createTaskFromDefinition(varietyId, taskCode, nextQueue);
+      const nextTask: InspectionTask = {
+        ...task,
+        samplings,
+        cardsCompleted: true,
+        completedAt: task.completedAt || new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        uiStatus: 'processed',
+      };
+
+      return {
+        ...current,
+        syncQueue: nextQueue,
+        catalog: current.catalog.map((entry) =>
+          entry.id === varietyId
+            ? {
+                ...entry,
+                status: 'ready',
+                updatedAt: new Date().toISOString(),
+                lastError: undefined,
+                setup: {
+                  ...entry.setup,
+                  localWorkbook: applied.workbook,
+                },
+              }
+            : entry,
+        ),
+        inspections: {
+          ...current.inspections,
+          [varietyId]: {
+            ...current.inspections[varietyId],
+            [taskCode]: {
+              ...nextTask,
+              uiStatus: getTaskUiStatus(varietyId, nextTask, nextQueue),
+            },
+          },
+        },
+      };
+    });
+  }
+
   async function processQueueInternal(queueOverride?: QueuedOperation[]) {
     const queue = queueOverride || stateRef.current.syncQueue;
     for (const item of queue) {
@@ -461,6 +1033,38 @@ export function V2AppProvider({ children }: { children: ReactNode }) {
           (item.payload as Record<string, unknown>).kind === 'disease_card'
         ) {
           await processDiseaseCardOperation(item);
+          continue;
+        }
+
+        if (
+          item.type === 'write_sheet' &&
+          (item.payload as Record<string, unknown>).kind === 'phenology_step'
+        ) {
+          await processPhenologyStepOperation(item);
+          continue;
+        }
+
+        if (
+          item.type === 'write_sheet' &&
+          (item.payload as Record<string, unknown>).kind === 'choice_step'
+        ) {
+          await processChoiceStepOperation(item);
+          continue;
+        }
+
+        if (
+          item.type === 'write_sheet' &&
+          (item.payload as Record<string, unknown>).kind === 'score_step'
+        ) {
+          await processScoreStepOperation(item);
+          continue;
+        }
+
+        if (
+          item.type === 'write_sheet' &&
+          (item.payload as Record<string, unknown>).kind === 'structure_sampling_step'
+        ) {
+          await processStructureSamplingStepOperation(item);
           continue;
         }
 
@@ -870,7 +1474,215 @@ export function V2AppProvider({ children }: { children: ReactNode }) {
                     ? isMeasurementCardComplete(nextCard)
                     : false,
             };
+            }),
+          });
+        },
+      updatePhenologyPlot(varietyId, taskCode, plot, changes) {
+        const currentTask = getTaskInternal(varietyId, taskCode);
+        if (currentTask.flowKind !== 'phenology_by_plot' || currentTask.completedAt) {
+          return;
+        }
+
+        const nextPlots = {
+          ...(currentTask.phenologyPlots || createEmptyPhenologyPlots()),
+          [plot]: {
+            ...(currentTask.phenologyPlots?.[plot] || {
+              plot,
+              confirmed: false,
+              isComplete: false,
+            }),
+            ...changes,
+          },
+        } as Record<'1' | '2' | '3', PhenologyPlotDraft>;
+
+        nextPlots[plot] = {
+          ...nextPlots[plot],
+          isComplete: isPhenologyPlotComplete(nextPlots[plot]),
+        };
+
+        saveDraftTask(varietyId, taskCode, {
+          ...currentTask,
+          phenologyPlots: nextPlots,
+        });
+      },
+      updateChoicePlot(varietyId, taskCode, plot, changes) {
+        const currentTask = getTaskInternal(varietyId, taskCode);
+        if (currentTask.flowKind !== 'choice_by_plot' || currentTask.completedAt) {
+          return;
+        }
+
+        const nextPlots = {
+          ...(currentTask.choicePlots || createEmptyChoicePlots()),
+          [plot]: {
+            ...(currentTask.choicePlots?.[plot] || {
+              plot,
+              isComplete: false,
+            }),
+            ...changes,
+          },
+        } as Record<'1' | '2' | '3', ChoicePlotDraft>;
+
+        nextPlots[plot] = {
+          ...nextPlots[plot],
+          isComplete: isChoicePlotComplete(nextPlots[plot]),
+        };
+
+        saveDraftTask(varietyId, taskCode, {
+          ...currentTask,
+          choicePlots: nextPlots,
+        });
+      },
+      updateScorePlot(varietyId, taskCode, plot, changes) {
+        const currentTask = getTaskInternal(varietyId, taskCode);
+        if (currentTask.flowKind !== 'score_by_plot' || currentTask.completedAt) {
+          return;
+        }
+
+        const nextPlots = {
+          ...(currentTask.scorePlots || createEmptyScorePlots()),
+          [plot]: {
+            ...(currentTask.scorePlots?.[plot] || {
+              plot,
+              isComplete: false,
+            }),
+            ...changes,
+          },
+        } as Record<'1' | '2' | '3', ScorePlotDraft>;
+
+        nextPlots[plot] = {
+          ...nextPlots[plot],
+          isComplete: isScorePlotComplete(nextPlots[plot]),
+        };
+
+        saveDraftTask(varietyId, taskCode, {
+          ...currentTask,
+          scorePlots: nextPlots,
+        });
+      },
+      updateSamplingPlot(varietyId, taskCode, samplingId, plot) {
+        const currentTask = getTaskInternal(varietyId, taskCode);
+        if (currentTask.flowKind !== 'structure_by_sampling' || currentTask.completedAt) {
+          return;
+        }
+
+        const nextSamplings = {
+          ...(currentTask.samplings || createEmptySamplings()),
+          [samplingId]: {
+            ...(currentTask.samplings?.[samplingId] || {
+              samplingId,
+              cards: [],
+              isComplete: false,
+            }),
+            plot,
+          },
+        } as Record<'1' | '2', StructureSamplingDraft>;
+
+        nextSamplings[samplingId] = {
+          ...nextSamplings[samplingId],
+          isComplete: isSamplingComplete(nextSamplings[samplingId]),
+        };
+
+        saveDraftTask(varietyId, taskCode, {
+          ...currentTask,
+          samplings: nextSamplings,
+        });
+      },
+      addSamplingCard(varietyId, taskCode, samplingId) {
+        const currentTask = getTaskInternal(varietyId, taskCode);
+        if (currentTask.flowKind !== 'structure_by_sampling' || currentTask.completedAt) {
+          return;
+        }
+
+        const nextSamplings = {
+          ...(currentTask.samplings || createEmptySamplings()),
+        } as Record<'1' | '2', StructureSamplingDraft>;
+        const currentSampling = nextSamplings[samplingId] || {
+          samplingId,
+          cards: [],
+          isComplete: false,
+        };
+
+        nextSamplings[samplingId] = {
+          ...currentSampling,
+          cards: [
+            ...currentSampling.cards,
+            {
+              id: createId('plant'),
+              samplingId,
+              isComplete: false,
+            },
+          ],
+          isComplete: false,
+        };
+
+        saveDraftTask(varietyId, taskCode, {
+          ...currentTask,
+          samplings: nextSamplings,
+        });
+      },
+      updateSamplingCard(varietyId, taskCode, samplingId, cardId, changes) {
+        const currentTask = getTaskInternal(varietyId, taskCode);
+        if (currentTask.flowKind !== 'structure_by_sampling' || currentTask.completedAt) {
+          return;
+        }
+
+        const nextSamplings = {
+          ...(currentTask.samplings || createEmptySamplings()),
+        } as Record<'1' | '2', StructureSamplingDraft>;
+        const currentSampling = nextSamplings[samplingId];
+        if (!currentSampling) {
+          return;
+        }
+
+        nextSamplings[samplingId] = {
+          ...currentSampling,
+          cards: currentSampling.cards.map((card) => {
+            if (card.id !== cardId || card.isComplete) {
+              return card;
+            }
+
+            const nextCard = { ...card, ...changes };
+            return {
+              ...nextCard,
+              isComplete: isStructureCardComplete(nextCard),
+            };
           }),
+        };
+        nextSamplings[samplingId].isComplete = isSamplingComplete(nextSamplings[samplingId]);
+
+        saveDraftTask(varietyId, taskCode, {
+          ...currentTask,
+          samplings: nextSamplings,
+        });
+      },
+      removeSamplingCard(varietyId, taskCode, samplingId, cardId) {
+        const currentTask = getTaskInternal(varietyId, taskCode);
+        if (currentTask.flowKind !== 'structure_by_sampling' || currentTask.completedAt) {
+          return;
+        }
+
+        const nextSamplings = {
+          ...(currentTask.samplings || createEmptySamplings()),
+        } as Record<'1' | '2', StructureSamplingDraft>;
+        const currentSampling = nextSamplings[samplingId];
+        if (!currentSampling) {
+          return;
+        }
+
+        const target = currentSampling.cards.find((card) => card.id === cardId);
+        if (!target || target.isComplete) {
+          return;
+        }
+
+        nextSamplings[samplingId] = {
+          ...currentSampling,
+          cards: currentSampling.cards.filter((card) => card.id !== cardId),
+        };
+        nextSamplings[samplingId].isComplete = isSamplingComplete(nextSamplings[samplingId]);
+
+        saveDraftTask(varietyId, taskCode, {
+          ...currentTask,
+          samplings: nextSamplings,
         });
       },
       async completeTaskCard(varietyId, taskCode, cardId) {
@@ -1004,6 +1816,34 @@ export function V2AppProvider({ children }: { children: ReactNode }) {
           if (!currentTask.cards.length || currentTask.cards.some((card) => isDraftDiseaseCard(card))) {
             throw new Error(v2Copy.taskInfectionCardsRequired);
           }
+        } else if (currentTask.flowKind === 'phenology_by_plot') {
+          if (
+            !currentTask.phenologyPlots ||
+            !Object.values(currentTask.phenologyPlots).every(isPhenologyPlotComplete)
+          ) {
+            throw new Error(v2Copy.taskOverviewRequired);
+          }
+        } else if (currentTask.flowKind === 'choice_by_plot') {
+          if (
+            !currentTask.choicePlots ||
+            !Object.values(currentTask.choicePlots).every(isChoicePlotComplete)
+          ) {
+            throw new Error(v2Copy.taskOverviewRequired);
+          }
+        } else if (currentTask.flowKind === 'score_by_plot') {
+          if (
+            !currentTask.scorePlots ||
+            !Object.values(currentTask.scorePlots).every(isScorePlotComplete)
+          ) {
+            throw new Error(v2Copy.taskOverviewRequired);
+          }
+        } else if (currentTask.flowKind === 'structure_by_sampling') {
+          if (
+            !currentTask.samplings ||
+            !Object.values(currentTask.samplings).every(isSamplingComplete)
+          ) {
+            throw new Error(v2Copy.taskMeasurementRequired);
+          }
         } else if (currentTask.flowKind === 'measurement_cards') {
           if (!currentTask.cards.length || !currentTask.cards.every(isMeasurementCardComplete)) {
             throw new Error(v2Copy.taskMeasurementRequired);
@@ -1033,33 +1873,148 @@ export function V2AppProvider({ children }: { children: ReactNode }) {
           throw new Error(v2Copy.completeTaskBeforeQueue);
         }
 
-        const operation: QueuedOperation = {
-          id: createId('queue'),
-          type: 'submit_task',
-          varietyId,
-          screenId: taskCode,
-          status: 'queued',
-          idempotencyKey: `${variety.binding.spreadsheetId}:${taskCode}:${task.updatedAt}`,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-          retryCount: 0,
-          payload: {
-            taskCode,
-            title: task.title,
-          },
-          writes: templateService.buildTaskWrites(variety, task, variety.setup?.mapsUrl, stateRef.current.session?.email),
-          media: [
-            ...(task.overviewPhotoUri
-              ? [{ localUri: task.overviewPhotoUri, mimeType: 'image/jpeg' as const }]
-              : []),
-            ...task.cards
-              .filter((card) => card.photoUri)
-              .map((card) => ({
-                localUri: card.photoUri as string,
-                mimeType: 'image/jpeg' as const,
-              })),
-          ],
-        };
+        const taskDef = taskDefinitionsByCode[taskCode];
+        if (
+          (
+            task.flowKind === 'phenology_by_plot' ||
+            task.flowKind === 'choice_by_plot' ||
+            task.flowKind === 'score_by_plot' ||
+            task.flowKind === 'structure_by_sampling'
+          ) &&
+          !taskDef?.logicalSheetKey
+        ) {
+          throw new Error(v2Copy.localSyncError);
+        }
+        const operation: QueuedOperation =
+          task.flowKind === 'phenology_by_plot'
+            ? {
+                id: createId('queue'),
+                type: 'write_sheet',
+                varietyId,
+                screenId: taskCode,
+                status: 'queued',
+                idempotencyKey: `${variety.binding.spreadsheetId}:${taskCode}:${task.updatedAt}`,
+                createdAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString(),
+                retryCount: 0,
+                payload: {
+                  kind: 'phenology_step',
+                  taskCode,
+                  logicalSheetKey: taskDef.logicalSheetKey,
+                  plots: task.phenologyPlots,
+                },
+                media: Object.values(task.phenologyPlots || {})
+                  .filter((plot) => plot.photoUri)
+                  .map((plot) => ({
+                    localUri: plot.photoUri as string,
+                    mimeType: 'image/jpeg' as const,
+                  })),
+              }
+            : task.flowKind === 'choice_by_plot'
+              ? {
+                  id: createId('queue'),
+                  type: 'write_sheet',
+                  varietyId,
+                  screenId: taskCode,
+                  status: 'queued',
+                  idempotencyKey: `${variety.binding.spreadsheetId}:${taskCode}:${task.updatedAt}`,
+                  createdAt: new Date().toISOString(),
+                  updatedAt: new Date().toISOString(),
+                  retryCount: 0,
+                  payload: {
+                    kind: 'choice_step',
+                    taskCode,
+                    logicalSheetKey: taskDef.logicalSheetKey,
+                    plots: task.choicePlots,
+                  },
+                  media: Object.values(task.choicePlots || {})
+                    .filter((plot) => plot.photoUri)
+                    .map((plot) => ({
+                      localUri: plot.photoUri as string,
+                      mimeType: 'image/jpeg' as const,
+                    })),
+                }
+              : task.flowKind === 'score_by_plot'
+                ? {
+                    id: createId('queue'),
+                    type: 'write_sheet',
+                    varietyId,
+                    screenId: taskCode,
+                    status: 'queued',
+                    idempotencyKey: `${variety.binding.spreadsheetId}:${taskCode}:${task.updatedAt}`,
+                    createdAt: new Date().toISOString(),
+                    updatedAt: new Date().toISOString(),
+                    retryCount: 0,
+                    payload: {
+                      kind: 'score_step',
+                      taskCode,
+                      logicalSheetKey: taskDef.logicalSheetKey,
+                      plots: task.scorePlots,
+                    },
+                    media: Object.values(task.scorePlots || {})
+                      .filter((plot) => plot.photoUri)
+                      .map((plot) => ({
+                        localUri: plot.photoUri as string,
+                        mimeType: 'image/jpeg' as const,
+                      })),
+                  }
+              : task.flowKind === 'structure_by_sampling'
+                ? {
+                    id: createId('queue'),
+                    type: 'write_sheet',
+                    varietyId,
+                    screenId: taskCode,
+                    status: 'queued',
+                    idempotencyKey: `${variety.binding.spreadsheetId}:${taskCode}:${task.updatedAt}`,
+                    createdAt: new Date().toISOString(),
+                    updatedAt: new Date().toISOString(),
+                    retryCount: 0,
+                    payload: {
+                      kind: 'structure_sampling_step',
+                      taskCode,
+                      logicalSheetKey: taskDef.logicalSheetKey,
+                      samplings: task.samplings,
+                    },
+                    media: Object.values(task.samplings || {})
+                      .flatMap((sampling) => sampling.cards)
+                      .filter((card) => card.photoUri)
+                      .map((card) => ({
+                        localUri: card.photoUri as string,
+                        mimeType: 'image/jpeg' as const,
+                      })),
+                  }
+            : {
+                id: createId('queue'),
+                type: 'submit_task',
+                varietyId,
+                screenId: taskCode,
+                status: 'queued',
+                idempotencyKey: `${variety.binding.spreadsheetId}:${taskCode}:${task.updatedAt}`,
+                createdAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString(),
+                retryCount: 0,
+                payload: {
+                  taskCode,
+                  title: task.title,
+                },
+                writes: templateService.buildTaskWrites(
+                  variety,
+                  task,
+                  variety.setup?.mapsUrl,
+                  stateRef.current.session?.email,
+                ),
+                media: [
+                  ...(task.overviewPhotoUri
+                    ? [{ localUri: task.overviewPhotoUri, mimeType: 'image/jpeg' as const }]
+                    : []),
+                  ...task.cards
+                    .filter((card) => card.photoUri)
+                    .map((card) => ({
+                      localUri: card.photoUri as string,
+                      mimeType: 'image/jpeg' as const,
+                    })),
+                ],
+              };
 
         const nextQueue = [
           operation,

@@ -5,9 +5,18 @@ import {
   TEMPLATE_SHEETS,
 } from '../config/templateSchema';
 import {
+  ChoicePlotDraft,
+  ChoiceSheetKey,
   DiseaseSheetKey,
   InspectionTask,
+  PhenologyPlotDraft,
+  PhenologySheetKey,
+  ScorePlotDraft,
+  ScoreSheetKey,
   SheetWriteOperation,
+  StructurePlantCardDraft,
+  StructureSamplingDraft,
+  StructureSheetKey,
   VarietyCreationDraft,
   VarietyRecord,
 } from '../types/app';
@@ -49,6 +58,36 @@ export function resolveDiseaseBlockColumns(plot: Plot) {
   return { anchor: 10, photo: 11, meta: 12, count: 13, percent: 14 };
 }
 
+export function resolvePhenologyBlockColumns(plot: Plot) {
+  if (plot === '1') {
+    return { confirmation: 0, photo: 1, meta: 2 };
+  }
+  if (plot === '2') {
+    return { confirmation: 4, photo: 5, meta: 6 };
+  }
+  return { confirmation: 8, photo: 9, meta: 10 };
+}
+
+export function resolveChoiceBlockColumns(plot: Plot) {
+  if (plot === '1') {
+    return { value: 0, photo: 1, meta: 2 };
+  }
+  if (plot === '2') {
+    return { value: 4, photo: 5, meta: 6 };
+  }
+  return { value: 8, photo: 9, meta: 10 };
+}
+
+export function resolveScoreBlockColumns(plot: Plot) {
+  if (plot === '1') {
+    return { value: 0, photo: 1, meta: 2 };
+  }
+  if (plot === '2') {
+    return { value: 4, photo: 5, meta: 6 };
+  }
+  return { value: 8, photo: 9, meta: 10 };
+}
+
 export function findFirstDiseaseRow(sheet: (string | number | boolean)[][], plot: Plot) {
   const { anchor } = resolveDiseaseBlockColumns(plot);
   let rowIndex = DATA_START_ROW_INDEX;
@@ -82,6 +121,10 @@ function cloneSheet(rows: (string | number)[][]) {
   return rows.map((row) => [...row]);
 }
 
+function sheetClone(rows: (string | number | boolean)[][]) {
+  return rows.map((row) => [...row]);
+}
+
 function ensureCell(sheet: (string | number | boolean)[][], rowIndex: number, columnIndex: number) {
   while (sheet.length <= rowIndex) {
     sheet.push([]);
@@ -97,7 +140,9 @@ function buildTemplateWorkbook() {
     workbook[name] = cloneSheet(rows);
   });
   EMPTY_TRAIT_SHEETS.forEach((name) => {
-    workbook[name] = cloneSheet(GENERIC_TRAIT_HEADERS);
+    if (!workbook[name]) {
+      workbook[name] = cloneSheet(GENERIC_TRAIT_HEADERS);
+    }
   });
   return workbook;
 }
@@ -135,6 +180,51 @@ export interface DiseaseCardWriteResult {
   count: number;
 }
 
+export interface PhenologyStepWriteInput {
+  plots: Record<'1' | '2' | '3', PhenologyPlotDraft>;
+  userEmail?: string;
+}
+
+export interface PhenologyStepWriteResult {
+  workbook: Workbook;
+  sheetName: string;
+  rowIndex: number;
+}
+
+export interface ChoiceStepWriteInput {
+  plots: Record<'1' | '2' | '3', ChoicePlotDraft>;
+  userEmail?: string;
+}
+
+export interface ChoiceStepWriteResult {
+  workbook: Workbook;
+  sheetName: string;
+  rowIndex: number;
+}
+
+export interface ScoreStepWriteInput {
+  plots: Record<'1' | '2' | '3', ScorePlotDraft>;
+  userEmail?: string;
+}
+
+export interface ScoreStepWriteResult {
+  workbook: Workbook;
+  sheetName: string;
+  rowIndex: number;
+}
+
+export interface StructureSamplingStepWriteInput {
+  samplings: Record<'1' | '2', StructureSamplingDraft>;
+  userEmail?: string;
+}
+
+export interface StructureSamplingStepWriteResult {
+  workbook: Workbook;
+  sheetName: string;
+  rowIndexStart: number;
+  rowsWritten: number;
+}
+
 export interface TemplateService {
   createVarietyWorkbook(draft: VarietyCreationDraft): Workbook;
   buildCreationWrites(draft: VarietyCreationDraft): SheetWriteOperation[];
@@ -150,6 +240,26 @@ export interface TemplateService {
     logicalSheetKey: DiseaseSheetKey,
     input: DiseaseCardWriteInput,
   ): DiseaseCardWriteResult;
+  applyPhenologyStepWrite(
+    workbook: Workbook,
+    logicalSheetKey: PhenologySheetKey,
+    input: PhenologyStepWriteInput,
+  ): PhenologyStepWriteResult;
+  applyChoiceStepWrite(
+    workbook: Workbook,
+    logicalSheetKey: ChoiceSheetKey,
+    input: ChoiceStepWriteInput,
+  ): ChoiceStepWriteResult;
+  applyScoreStepWrite(
+    workbook: Workbook,
+    logicalSheetKey: ScoreSheetKey,
+    input: ScoreStepWriteInput,
+  ): ScoreStepWriteResult;
+  appendStructureSamplingStepWrite(
+    workbook: Workbook,
+    logicalSheetKey: StructureSheetKey,
+    input: StructureSamplingStepWriteInput,
+  ): StructureSamplingStepWriteResult;
 }
 
 class WorkbookTemplateService implements TemplateService {
@@ -202,7 +312,9 @@ class WorkbookTemplateService implements TemplateService {
     input: DiseaseCardWriteInput,
   ): DiseaseCardWriteResult {
     const sheetName = SHEET_ALIASES[logicalSheetKey].local;
-    const sheet = workbook[sheetName] ? sheetClone(workbook[sheetName]) : cloneSheet(TEMPLATE_SHEETS[sheetName]);
+    const sheet = workbook[sheetName]
+      ? sheetClone(workbook[sheetName])
+      : cloneSheet(TEMPLATE_SHEETS[sheetName]);
     const { anchor, photo, meta, count, percent } = resolveDiseaseBlockColumns(input.plot);
     const rowIndex = findFirstDiseaseRow(sheet, input.plot);
 
@@ -228,6 +340,142 @@ class WorkbookTemplateService implements TemplateService {
     };
   }
 
+  applyPhenologyStepWrite(
+    workbook: Workbook,
+    logicalSheetKey: PhenologySheetKey,
+    input: PhenologyStepWriteInput,
+  ): PhenologyStepWriteResult {
+    const sheetName = SHEET_ALIASES[logicalSheetKey].local;
+    const sheet = workbook[sheetName]
+      ? sheetClone(workbook[sheetName])
+      : cloneSheet(TEMPLATE_SHEETS[sheetName]);
+
+    (['1', '2', '3'] as const).forEach((plot) => {
+      const plotState = input.plots[plot];
+      const { confirmation, photo, meta } = resolvePhenologyBlockColumns(plot);
+      ensureCell(sheet, DATA_START_ROW_INDEX, meta);
+      sheet[DATA_START_ROW_INDEX][confirmation] = plotState.confirmed ? 'да' : '';
+      sheet[DATA_START_ROW_INDEX][photo] = plotState.photoUri ? PHOTO_PENDING_UPLOAD : '';
+      sheet[DATA_START_ROW_INDEX][meta] = formatPhotoMeta(
+        input.userEmail,
+        plotState.capturedLocation?.mapsUrl,
+        plotState.capturedAt,
+      );
+    });
+
+    workbook[sheetName] = sheet;
+    return {
+      workbook,
+      sheetName,
+      rowIndex: DATA_START_ROW_INDEX,
+    };
+  }
+
+  applyChoiceStepWrite(
+    workbook: Workbook,
+    logicalSheetKey: ChoiceSheetKey,
+    input: ChoiceStepWriteInput,
+  ): ChoiceStepWriteResult {
+    const sheetName = SHEET_ALIASES[logicalSheetKey].local;
+    const sheet = workbook[sheetName]
+      ? sheetClone(workbook[sheetName])
+      : cloneSheet(TEMPLATE_SHEETS[sheetName]);
+
+    (['1', '2', '3'] as const).forEach((plot) => {
+      const plotState = input.plots[plot];
+      const { value, photo, meta } = resolveChoiceBlockColumns(plot);
+      ensureCell(sheet, DATA_START_ROW_INDEX, meta);
+      sheet[DATA_START_ROW_INDEX][value] = plotState.selectedValue || '';
+      sheet[DATA_START_ROW_INDEX][photo] = plotState.photoUri ? PHOTO_PENDING_UPLOAD : '';
+      sheet[DATA_START_ROW_INDEX][meta] = formatPhotoMeta(
+        input.userEmail,
+        plotState.capturedLocation?.mapsUrl,
+        plotState.capturedAt,
+      );
+    });
+
+    workbook[sheetName] = sheet;
+    return {
+      workbook,
+      sheetName,
+      rowIndex: DATA_START_ROW_INDEX,
+    };
+  }
+
+  applyScoreStepWrite(
+    workbook: Workbook,
+    logicalSheetKey: ScoreSheetKey,
+    input: ScoreStepWriteInput,
+  ): ScoreStepWriteResult {
+    const sheetName = SHEET_ALIASES[logicalSheetKey].local;
+    const sheet = workbook[sheetName]
+      ? sheetClone(workbook[sheetName])
+      : cloneSheet(TEMPLATE_SHEETS[sheetName]);
+
+    (['1', '2', '3'] as const).forEach((plot) => {
+      const plotState = input.plots[plot];
+      const { value, photo, meta } = resolveScoreBlockColumns(plot);
+      ensureCell(sheet, DATA_START_ROW_INDEX, meta);
+      sheet[DATA_START_ROW_INDEX][value] = plotState.selectedScore || '';
+      sheet[DATA_START_ROW_INDEX][photo] = plotState.photoUri ? PHOTO_PENDING_UPLOAD : '';
+      sheet[DATA_START_ROW_INDEX][meta] = formatPhotoMeta(
+        input.userEmail,
+        plotState.capturedLocation?.mapsUrl,
+        plotState.capturedAt,
+      );
+    });
+
+    workbook[sheetName] = sheet;
+    return {
+      workbook,
+      sheetName,
+      rowIndex: DATA_START_ROW_INDEX,
+    };
+  }
+
+  appendStructureSamplingStepWrite(
+    workbook: Workbook,
+    logicalSheetKey: StructureSheetKey,
+    input: StructureSamplingStepWriteInput,
+  ): StructureSamplingStepWriteResult {
+    const sheetName = SHEET_ALIASES[logicalSheetKey].local;
+    const sheet = workbook[sheetName]
+      ? sheetClone(workbook[sheetName])
+      : cloneSheet(TEMPLATE_SHEETS[sheetName]);
+
+    let rowIndex = Math.max(DATA_START_ROW_INDEX, findFirstEmptyRow(sheet, 0));
+    const rowIndexStart = rowIndex;
+    let rowsWritten = 0;
+
+    (['1', '2'] as const).forEach((samplingId) => {
+      const sampling = input.samplings[samplingId];
+      const plot = sampling?.plot || '';
+      (sampling?.cards || []).forEach((card: StructurePlantCardDraft) => {
+        ensureCell(sheet, rowIndex, 5);
+        sheet[rowIndex][0] = samplingId;
+        sheet[rowIndex][1] = plot;
+        sheet[rowIndex][2] = card.plantNumber || '';
+        sheet[rowIndex][3] = card.value || '';
+        sheet[rowIndex][4] = card.photoUri ? PHOTO_PENDING_UPLOAD : '';
+        sheet[rowIndex][5] = formatPhotoMeta(
+          input.userEmail,
+          card.capturedLocation?.mapsUrl,
+          card.capturedAt,
+        );
+        rowIndex += 1;
+        rowsWritten += 1;
+      });
+    });
+
+    workbook[sheetName] = sheet;
+    return {
+      workbook,
+      sheetName,
+      rowIndexStart,
+      rowsWritten,
+    };
+  }
+
   buildTaskWrites(variety: VarietyRecord, task: InspectionTask, mapsUrl?: string, userEmail?: string) {
     const rows = task.cards.map((card) => [
       card.note || task.title,
@@ -246,10 +494,6 @@ class WorkbookTemplateService implements TemplateService {
       },
     ];
   }
-}
-
-function sheetClone(rows: (string | number | boolean)[][]) {
-  return rows.map((row) => [...row]);
 }
 
 export const templateService: TemplateService = new WorkbookTemplateService();

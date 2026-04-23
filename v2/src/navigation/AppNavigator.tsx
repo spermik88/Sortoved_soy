@@ -10,10 +10,14 @@ import { CreationScreen } from '../screens/CreationScreen';
 import { QueueScreen } from '../screens/QueueScreen';
 import { AuthScreen, StartScreen } from '../screens/StartScreens';
 import {
+  ChoiceTaskScreen,
   FusariumCardsScreen,
   MeasurementTaskScreen,
   ObservationTaskScreen,
   PendingTaskScreen,
+  PhenologyTaskScreen,
+  ScoreTaskScreen,
+  StructureSamplingTaskScreen,
 } from '../screens/TaskScreens';
 import { V2RootStackParamList } from './types';
 
@@ -35,6 +39,10 @@ export function V2AppNavigator() {
         <Stack.Screen name="Creation" component={CreationScreen} />
         <Stack.Screen name="Variety" component={VarietyScreen} />
         <Stack.Screen name="FusariumCards" component={FusariumCardsScreen} />
+        <Stack.Screen name="ChoiceTask" component={ChoiceTaskScreen} />
+        <Stack.Screen name="ScoreTask" component={ScoreTaskScreen} />
+        <Stack.Screen name="PhenologyTask" component={PhenologyTaskScreen} />
+        <Stack.Screen name="StructureSamplingTask" component={StructureSamplingTaskScreen} />
         <Stack.Screen name="ObservationTask" component={ObservationTaskScreen} />
         <Stack.Screen name="MeasurementTask" component={MeasurementTaskScreen} />
         <Stack.Screen name="PendingTask" component={PendingTaskScreen} />
