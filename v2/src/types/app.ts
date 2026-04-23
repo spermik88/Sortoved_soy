@@ -18,6 +18,8 @@ export type ChoiceSheetKey =
 export type ScoreSheetKey =
   | 'lodging_resistance_sheet'
   | 'shattering_resistance_sheet';
+export type YieldSheetKey = 'yield_per_area_sheet';
+export type ThousandSeedWeightSheetKey = 'thousand_seed_weight_sheet';
 export type StructureSheetKey =
   | 'stem_length_sheet'
   | 'lower_pod_attachment_sheet'
@@ -37,6 +39,8 @@ export type LocalSheetKey =
   | DiseaseSheetKey
   | ChoiceSheetKey
   | ScoreSheetKey
+  | YieldSheetKey
+  | ThousandSeedWeightSheetKey
   | StructureSheetKey
   | PhenologySheetKey;
 export type TaskFlowKind =
@@ -44,6 +48,8 @@ export type TaskFlowKind =
   | 'disease_cards'
   | 'choice_by_plot'
   | 'score_by_plot'
+  | 'yield_by_plot'
+  | 'thousand_seed_weight_step'
   | 'structure_by_sampling'
   | 'phenology_by_plot'
   | 'observation_single'
@@ -55,6 +61,7 @@ export type TaskUiStatus =
   | 'draft'
   | 'ready_local'
   | 'queued'
+  | 'analysis_invalid'
   | 'processed';
 
 export interface GoogleSession {
@@ -166,6 +173,41 @@ export interface ScorePlotDraft {
   isComplete: boolean;
 }
 
+export interface YieldPlotDraft {
+  plot: '1' | '2' | '3';
+  rawGrainMassKg?: string;
+  moisturePercent?: string;
+  areaSquareMeters: number;
+  yieldTonsPerHectare?: string;
+  isComplete: boolean;
+}
+
+export type SeedWeightPair = '1+2' | '1+3' | '2+3';
+
+export interface CandidatePairResult {
+  pair: SeedWeightPair;
+  sumWeight: number;
+  actualDifference: number;
+  allowedDifference: number;
+  isAllowed: boolean;
+  finalWeight: number;
+}
+
+export interface ThousandSeedWeightDraft {
+  sample1Weight?: string;
+  sample2Weight?: string;
+  sample3Weight?: string;
+  requiresThirdSample: boolean;
+  candidatePairs: CandidatePairResult[];
+  selectedPair?: SeedWeightPair;
+  sumWeight?: string;
+  actualDifference?: string;
+  allowedDifference?: string;
+  finalWeight?: string;
+  analysisStatus: 'valid' | 'invalid';
+  isComplete: boolean;
+}
+
 export interface StructurePlantCardDraft {
   id: string;
   samplingId: '1' | '2';
@@ -207,6 +249,8 @@ export interface InspectionTask {
   phenologyPlots?: Record<'1' | '2' | '3', PhenologyPlotDraft>;
   choicePlots?: Record<'1' | '2' | '3', ChoicePlotDraft>;
   scorePlots?: Record<'1' | '2' | '3', ScorePlotDraft>;
+  yieldPlots?: Record<'1' | '2' | '3', YieldPlotDraft>;
+  thousandSeedWeight?: ThousandSeedWeightDraft;
   samplings?: Record<'1' | '2', StructureSamplingDraft>;
   updatedAt: string;
 }

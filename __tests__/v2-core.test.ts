@@ -2,13 +2,19 @@ import { taskDefinitionsByCode } from '../v2/src/config/flowRegistry';
 import { formatPhotoMeta } from '../v2/src/utils/format';
 import { isValidGoogleSheetsUrl } from '../v2/src/services/sheetsService';
 import {
+  calculateYieldTonsPerHectare,
+  calculateActualDifference,
+  calculateAllowedDifference,
   buildDiseaseCellValue,
   findFirstDiseaseRow,
   recountDiseaseCards,
+  resolveThousandSeedWeightOutcome,
   resolveChoiceBlockColumns,
   resolveDiseaseBlockColumns,
   resolvePhenologyBlockColumns,
   resolveScoreBlockColumns,
+  resolveYieldBlockColumns,
+  roundThousandSeedWeightByGost,
   templateService,
 } from '../v2/src/services/templateService';
 import { VarietyCreationDraft } from '../v2/src/types/app';
@@ -440,6 +446,106 @@ describe('v2 core helpers', () => {
     expect(applied.workbook['17.Длина стебля'][3][4]).toBe('photo_pending_upload');
   });
 
+  it('calculates and writes yield plots into a fixed workbook row', () => {
+    expect(calculateYieldTonsPerHectare(120, 18, 5)).toBe(
+      Math.round((((120 * (100 - 18)) / (100 - 14)) / 5 / 10000) * 1000) / 1000,
+    );
+    expect(resolveYieldBlockColumns('1')).toEqual({ mass: 0, moisture: 1, area: 2, yield: 3, meta: 4 });
+    expect(resolveYieldBlockColumns('2')).toEqual({ mass: 6, moisture: 7, area: 8, yield: 9, meta: 10 });
+    expect(resolveYieldBlockColumns('3')).toEqual({ mass: 12, moisture: 13, area: 14, yield: 15, meta: 16 });
+
+    const workbook = templateService.createLocalWorkbookCopy();
+    const applied = templateService.applyYieldStepWrite(workbook, 'yield_per_area_sheet', {
+      userEmail: 'sample@mail.com',
+      plots: {
+        '1': { plot: '1', rawGrainMassKg: '120', moisturePercent: '18', areaSquareMeters: 5, yieldTonsPerHectare: '0.023', isComplete: true },
+        '2': { plot: '2', rawGrainMassKg: '110', moisturePercent: '16', areaSquareMeters: 5, yieldTonsPerHectare: '0.022', isComplete: true },
+        '3': { plot: '3', rawGrainMassKg: '130', moisturePercent: '20', areaSquareMeters: 5, yieldTonsPerHectare: '0.024', isComplete: true },
+      },
+    });
+
+    expect(applied.sheetName).toBe('26.Урожайность с единицы площади');
+    expect(applied.rowIndex).toBe(2);
+    expect(applied.workbook['26.Урожайность с единицы площади'][2][0]).toBe('120');
+    expect(applied.workbook['26.Урожайность с единицы площади'][2][1]).toBe('18');
+    expect(applied.workbook['26.Урожайность с единицы площади'][2][2]).toBe(5);
+    expect(applied.workbook['26.Урожайность с единицы площади'][2][3]).toBe('0.023');
+    expect(applied.workbook['26.Урожайность с единицы площади'][2][6]).toBe('110');
+    expect(applied.workbook['26.Урожайность с единицы площади'][2][9]).toBe('0.022');
+    expect(applied.workbook['26.Урожайность с единицы площади'][2][12]).toBe('130');
+    expect(applied.workbook['26.Урожайность с единицы площади'][2][15]).toBe('0.024');
+    expect(String(applied.workbook['26.Урожайность с единицы площади'][2][4])).toContain('sample@mail.com');
+  });
+
+  it('resolves thousand seed weight outcomes by GOST method', () => {
+    expect(calculateActualDifference(14.05, 13.68)).toBe(0.37);
+    expect(calculateAllowedDifference(27.73)).toBe(0.42);
+    expect(calculateAllowedDifference(253)).toBe(3.79);
+    expect(roundThousandSeedWeightByGost(34.25)).toBe(34.2);
+    expect(roundThousandSeedWeightByGost(34.35)).toBe(34.4);
+
+    const valid = resolveThousandSeedWeightOutcome({
+      sample1Weight: '13.68',
+      sample2Weight: '14.05',
+    });
+    expect(valid.requiresThirdSample).toBe(false);
+    expect(valid.selectedPair).toBe('1+2');
+    expect(valid.finalWeight).toBe('27.7');
+
+    const multiple = resolveThousandSeedWeightOutcome({
+      sample1Weight: '10.00',
+      sample2Weight: '10.45',
+      sample3Weight: '10.20',
+    });
+    expect(multiple.requiresThirdSample).toBe(true);
+    expect(multiple.candidatePairs.filter((pair) => pair.isAllowed)).toHaveLength(2);
+    expect(multiple.selectedPair).toBeUndefined();
+
+    const invalid = resolveThousandSeedWeightOutcome({
+      sample1Weight: '10.00',
+      sample2Weight: '11.00',
+      sample3Weight: '12.00',
+    });
+    expect(invalid.analysisStatus).toBe('invalid');
+    expect(invalid.finalWeight).toBe('');
+  });
+
+  it('writes thousand seed weight into a fixed workbook row', () => {
+    const workbook = templateService.createLocalWorkbookCopy();
+    const applied = templateService.applyThousandSeedWeightStepWrite(
+      workbook,
+      'thousand_seed_weight_sheet',
+      {
+        userEmail: 'sample@mail.com',
+        completedAt: '2026-04-23T10:15:00.000Z',
+        draft: {
+          sample1Weight: '17.76',
+          sample2Weight: '17.05',
+          sample3Weight: '17.13',
+          requiresThirdSample: true,
+          candidatePairs: [],
+          selectedPair: '2+3',
+          sumWeight: '34.18',
+          actualDifference: '0.08',
+          allowedDifference: '0.51',
+          finalWeight: '34.2',
+          analysisStatus: 'valid',
+          isComplete: true,
+        },
+      },
+    );
+
+    expect(applied.sheetName).toBe('27.Масса 1000 семян');
+    expect(applied.workbook['27.Масса 1000 семян'][2][0]).toBe('средняя проба');
+    expect(applied.workbook['27.Масса 1000 семян'][2][1]).toBe('17.76');
+    expect(applied.workbook['27.Масса 1000 семян'][2][2]).toBe('17.05');
+    expect(applied.workbook['27.Масса 1000 семян'][2][3]).toBe('17.13');
+    expect(applied.workbook['27.Масса 1000 семян'][2][4]).toBe('2+3');
+    expect(applied.workbook['27.Масса 1000 семян'][2][8]).toBe('34.2');
+    expect(applied.workbook['27.Масса 1000 семян'][2][9]).toBe('valid');
+    expect(String(applied.workbook['27.Масса 1000 семян'][2][10])).toContain('sample@mail.com');
+  });
+
   it('declares all disease steps as disease cards flow', () => {
     expect(taskDefinitionsByCode['1'].flowKind).toBe('disease_cards');
     expect(taskDefinitionsByCode['2'].flowKind).toBe('disease_cards');
@@ -466,10 +572,16 @@ describe('v2 core helpers', () => {
     );
     expect(taskDefinitionsByCode['15'].flowKind).toBe('score_by_plot');
     expect(taskDefinitionsByCode['16'].flowKind).toBe('score_by_plot');
+    expect(taskDefinitionsByCode['26'].flowKind).toBe('yield_by_plot');
     expect(taskDefinitionsByCode['15'].logicalSheetKey).toBe('lodging_resistance_sheet');
     expect(taskDefinitionsByCode['16'].logicalSheetKey).toBe('shattering_resistance_sheet');
+    expect(taskDefinitionsByCode['26'].logicalSheetKey).toBe('yield_per_area_sheet');
     expect(taskDefinitionsByCode['10'].hasCarouselSamples).toBe(false);
     expect(taskDefinitionsByCode['15'].hasCarouselSamples).toBe(false);
+    expect(taskDefinitionsByCode['26'].carouselAssetKey).toBe('yield_per_area');
+    expect(taskDefinitionsByCode['27'].flowKind).toBe('thousand_seed_weight_step');
+    expect(taskDefinitionsByCode['27'].logicalSheetKey).toBe('thousand_seed_weight_sheet');
+    expect(taskDefinitionsByCode['27'].carouselAssetKey).toBe('thousand_seed_weight');
     expect(taskDefinitionsByCode['17'].flowKind).toBe('structure_by_sampling');
     expect(taskDefinitionsByCode['25'].flowKind).toBe('structure_by_sampling');
     expect(taskDefinitionsByCode['17'].logicalSheetKey).toBe('stem_length_sheet');

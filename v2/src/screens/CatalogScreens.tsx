@@ -10,7 +10,7 @@ import { V2RootStackParamList } from '../navigation/types';
 import { InspectionTask } from '../types/app';
 
 function getTaskStatusLabel(task: InspectionTask | undefined) {
-  return taskStatusLabels[task?.uiStatus || 'not_started'];
+  return taskStatusLabels[task?.uiStatus || 'not_started'] || 'Ошибка анализа';
 }
 
 export function CatalogScreen({
@@ -73,6 +73,16 @@ export function VarietyScreen({
 
     if (taskDef.flowKind === 'score_by_plot') {
       navigation.navigate('ScoreTask', { varietyId: variety.id, taskCode });
+      return;
+    }
+
+    if (taskDef.flowKind === 'yield_by_plot') {
+      navigation.navigate('YieldTask', { varietyId: variety.id, taskCode });
+      return;
+    }
+
+    if (taskDef.flowKind === 'thousand_seed_weight_step') {
+      navigation.navigate('ThousandSeedWeightTask', { varietyId: variety.id, taskCode });
       return;
     }
 

@@ -60,6 +60,40 @@ const SCORE_BLOCK_HEADER_ROW = [
   'мета делянка 3',
 ] as const;
 
+const YIELD_BLOCK_HEADER_ROW = [
+  'масса сырого зерна делянка 1',
+  'влажность делянка 1',
+  'площадь делянка 1',
+  'урожайность делянка 1',
+  'мета делянка 1',
+  '',
+  'масса сырого зерна делянка 2',
+  'влажность делянка 2',
+  'площадь делянка 2',
+  'урожайность делянка 2',
+  'мета делянка 2',
+  '',
+  'масса сырого зерна делянка 3',
+  'влажность делянка 3',
+  'площадь делянка 3',
+  'урожайность делянка 3',
+  'мета делянка 3',
+] as const;
+
+const THOUSAND_SEED_WEIGHT_HEADER_ROW = [
+  'источник пробы',
+  'масса пробы 1, г',
+  'масса пробы 2, г',
+  'масса пробы 3, г',
+  'выбранная пара',
+  'суммарная масса пары, г',
+  'фактическое расхождение, г',
+  'допустимое расхождение, г',
+  'масса 1000 семян, г',
+  'статус анализа',
+  'мета',
+] as const;
+
 function createDiseaseSheetTemplate() {
   return [
     [1, '', '', '', '', 2, '', '', '', '', 3, '', '', '', ''],
@@ -83,6 +117,20 @@ function createChoiceSheetTemplate(title: string) {
 
 function createScoreSheetTemplate(title: string) {
   return [[title, '', '', '', '', '', '', '', '', '', ''], [...SCORE_BLOCK_HEADER_ROW]] as (
+    | string
+    | number
+  )[][];
+}
+
+function createYieldSheetTemplate(title: string) {
+  return [[title, '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', ''], [...YIELD_BLOCK_HEADER_ROW]] as (
+    | string
+    | number
+  )[][];
+}
+
+function createThousandSeedWeightSheetTemplate(title: string) {
+  return [[title, '', '', '', '', '', '', '', '', '', ''], [...THOUSAND_SEED_WEIGHT_HEADER_ROW]] as (
     | string
     | number
   )[][];
@@ -175,6 +223,14 @@ export const SHEET_ALIASES: Record<
     local: '16.Устойчивость к осыпанию',
     futureRemote: '16.Устойчивость к осыпанию',
   },
+  yield_per_area_sheet: {
+    local: '26.Урожайность с единицы площади',
+    futureRemote: '26.Урожайность с единицы площади',
+  },
+  thousand_seed_weight_sheet: {
+    local: '27.Масса 1000 семян',
+    futureRemote: '27.Масса 1000 семян',
+  },
   stem_length_sheet: {
     local: '17.Длина стебля',
     futureRemote: '17.Длина стебля',
@@ -265,6 +321,12 @@ export const TEMPLATE_SHEETS: Record<string, (string | number)[][]> = {
   ),
   [SHEET_ALIASES.shattering_resistance_sheet.local]: createScoreSheetTemplate(
     '16. Устойчивость к осыпанию',
+  ),
+  [SHEET_ALIASES.yield_per_area_sheet.local]: createYieldSheetTemplate(
+    '26. Урожайность с единицы площади',
+  ),
+  [SHEET_ALIASES.thousand_seed_weight_sheet.local]: createThousandSeedWeightSheetTemplate(
+    '27. Масса 1000 семян',
   ),
   [SHEET_ALIASES.stem_length_sheet.local]: createStructureSheetTemplate('17. Длина стебля'),
   [SHEET_ALIASES.lower_pod_attachment_sheet.local]: createStructureSheetTemplate(

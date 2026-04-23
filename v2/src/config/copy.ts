@@ -1,6 +1,6 @@
 import { QueueStatus, QueuedOperation, TaskUiStatus } from '../types/app';
 
-export const taskStatusLabels: Record<TaskUiStatus, string> = {
+export const taskStatusLabels: Record<string, string> = {
   not_started: 'Не начато',
   draft: 'Черновик',
   ready_local: 'Готово локально',

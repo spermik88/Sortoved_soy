@@ -7,6 +7,8 @@ export type V2RootStackParamList = {
   FusariumCards: { varietyId: string; taskCode: string };
   ChoiceTask: { varietyId: string; taskCode: string };
   ScoreTask: { varietyId: string; taskCode: string };
+  YieldTask: { varietyId: string; taskCode: string };
+  ThousandSeedWeightTask: { varietyId: string; taskCode: string };
   PhenologyTask: { varietyId: string; taskCode: string };
   StructureSamplingTask: { varietyId: string; taskCode: string };
   ObservationTask: { varietyId: string; taskCode: string };

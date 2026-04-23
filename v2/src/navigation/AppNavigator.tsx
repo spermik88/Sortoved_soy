@@ -18,6 +18,8 @@ import {
   PhenologyTaskScreen,
   ScoreTaskScreen,
   StructureSamplingTaskScreen,
+  ThousandSeedWeightTaskScreen,
+  YieldTaskScreen,
 } from '../screens/TaskScreens';
 import { V2RootStackParamList } from './types';
 
@@ -41,6 +43,8 @@ export function V2AppNavigator() {
         <Stack.Screen name="FusariumCards" component={FusariumCardsScreen} />
         <Stack.Screen name="ChoiceTask" component={ChoiceTaskScreen} />
         <Stack.Screen name="ScoreTask" component={ScoreTaskScreen} />
+        <Stack.Screen name="YieldTask" component={YieldTaskScreen} />
+        <Stack.Screen name="ThousandSeedWeightTask" component={ThousandSeedWeightTaskScreen} />
         <Stack.Screen name="PhenologyTask" component={PhenologyTaskScreen} />
         <Stack.Screen name="StructureSamplingTask" component={StructureSamplingTaskScreen} />
         <Stack.Screen name="ObservationTask" component={ObservationTaskScreen} />

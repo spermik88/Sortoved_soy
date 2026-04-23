@@ -5,6 +5,8 @@ import {
   PhenologySheetKey,
   ScoreSheetKey,
   StructureSheetKey,
+  ThousandSeedWeightSheetKey,
+  YieldSheetKey,
   ScreenMappingRule,
   TaskFlowKind,
   TaskKind,
@@ -386,6 +388,62 @@ function scoreTask(
   };
 }
 
+function yieldTask(
+  code: string,
+  title: string,
+  screenId: string,
+  sheetName: string,
+  logicalSheetKey: YieldSheetKey,
+  intro: string,
+  criterionText: string,
+  explicitlySpecified: boolean,
+): TaskDefinition {
+  return {
+    code,
+    title,
+    screenId,
+    sheetName,
+    logicalSheetKey,
+    localSheetName: SHEET_ALIASES[logicalSheetKey].local,
+    futureRemoteSheetName: SHEET_ALIASES[logicalSheetKey].futureRemote,
+    kind: 'measurement',
+    flowKind: 'yield_by_plot',
+    intro,
+    criterionText,
+    carouselAssetKey: 'yield_per_area',
+    hasCarouselSamples: false,
+    explicitlySpecified,
+  };
+}
+
+function thousandSeedWeightTask(
+  code: string,
+  title: string,
+  screenId: string,
+  sheetName: string,
+  logicalSheetKey: ThousandSeedWeightSheetKey,
+  intro: string,
+  criterionText: string,
+  explicitlySpecified: boolean,
+): TaskDefinition {
+  return {
+    code,
+    title,
+    screenId,
+    sheetName,
+    logicalSheetKey,
+    localSheetName: SHEET_ALIASES[logicalSheetKey].local,
+    futureRemoteSheetName: SHEET_ALIASES[logicalSheetKey].futureRemote,
+    kind: 'measurement',
+    flowKind: 'thousand_seed_weight_step',
+    intro,
+    criterionText,
+    carouselAssetKey: 'thousand_seed_weight',
+    hasCarouselSamples: false,
+    explicitlySpecified,
+  };
+}
+
 function structureTask(
   code: string,
   title: string,
@@ -743,6 +801,8 @@ export const taskDefinitions: TaskDefinition[] = [
         '23',
         '24',
         '25',
+        '26',
+        '27',
       ].includes(item.code),
   ),
   choiceTask(
@@ -910,6 +970,26 @@ export const taskDefinitions: TaskDefinition[] = [
     'seed_weight_per_plant',
     true,
     'г',
+  ),
+  yieldTask(
+    '26',
+    'Урожайность с единицы площади',
+    'screen_d36d4541',
+    '26.Урожайность с единицы площади',
+    'yield_per_area_sheet',
+    'Для каждой делянки введите массу сырого зерна и влажность. Площадь делянки всегда 5 м², урожайность рассчитывается автоматически.',
+    'Урожайность (т/га) = (масса сырого зерна × (100 - W) / (100 - 14)) / S / 10000, где W — влажность, S = 5 м².',
+    true,
+  ),
+  thousandSeedWeightTask(
+    '27',
+    'Масса 1000 семян',
+    'screen_1a5ef412',
+    '27.Масса 1000 семян',
+    'thousand_seed_weight_sheet',
+    'Введите массы двух проб по 500 семян. Если расхождение превышает допуск, добавьте третью пробу и выберите допустимую пару.',
+    'Метод 2×500 семян по ГОСТ 12042-80 с возможной третьей пробой при недопустимом расхождении.',
+    true,
   ),
 ].map((item) =>
   ['10', '12', '14', '15', '16'].includes(item.code)

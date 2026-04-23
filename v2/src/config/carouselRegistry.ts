@@ -90,4 +90,16 @@ export const carouselRegistry: Record<string, CarouselRegistryEntry> = {
     available: false,
     imageSources: [],
   },
+  '26': {
+    taskCode: '26',
+    assetGroupKey: 'yield_per_area',
+    available: false,
+    imageSources: [],
+  },
+  '27': {
+    taskCode: '27',
+    assetGroupKey: 'thousand_seed_weight',
+    available: false,
+    imageSources: [],
+  },
 };

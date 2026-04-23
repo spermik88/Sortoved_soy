@@ -7,16 +7,22 @@ import {
 import {
   ChoicePlotDraft,
   ChoiceSheetKey,
+  CandidatePairResult,
   DiseaseSheetKey,
   InspectionTask,
   PhenologyPlotDraft,
   PhenologySheetKey,
   ScorePlotDraft,
   ScoreSheetKey,
+  SeedWeightPair,
   SheetWriteOperation,
   StructurePlantCardDraft,
   StructureSamplingDraft,
   StructureSheetKey,
+  ThousandSeedWeightDraft,
+  ThousandSeedWeightSheetKey,
+  YieldPlotDraft,
+  YieldSheetKey,
   VarietyCreationDraft,
   VarietyRecord,
 } from '../types/app';
@@ -27,6 +33,18 @@ type Plot = '1' | '2' | '3';
 
 const DATA_START_ROW_INDEX = 2;
 const PHOTO_PENDING_UPLOAD = 'photo_pending_upload';
+const THOUSAND_SEED_WEIGHT_TOLERANCE_TABLE = [
+  [0, 0.02, 0.03, 0.04, 0.06, 0.08, 0.09, 0.1, 0.12, 0.14],
+  [0.15, 0.16, 0.18, 0.2, 0.21, 0.22, 0.24, 0.26, 0.27, 0.28],
+  [0.3, 0.32, 0.33, 0.34, 0.36, 0.38, 0.39, 0.4, 0.42, 0.44],
+  [0.45, 0.46, 0.48, 0.5, 0.51, 0.52, 0.54, 0.56, 0.57, 0.58],
+  [0.6, 0.62, 0.63, 0.64, 0.66, 0.68, 0.69, 0.7, 0.72, 0.74],
+  [0.75, 0.76, 0.78, 0.79, 0.81, 0.82, 0.84, 0.85, 0.87, 0.88],
+  [0.9, 0.92, 0.93, 0.94, 0.96, 0.98, 0.99, 1.0, 1.02, 1.04],
+  [1.05, 1.06, 1.08, 1.1, 1.11, 1.12, 1.14, 1.16, 1.17, 1.18],
+  [1.2, 1.22, 1.23, 1.24, 1.26, 1.28, 1.29, 1.3, 1.32, 1.34],
+  [1.35, 1.37, 1.38, 1.4, 1.41, 1.42, 1.44, 1.45, 1.47, 1.48],
+] as const;
 
 export function findFirstEmptyRow(rows: (string | number | boolean)[][], minColumn = 0) {
   for (let index = 0; index < rows.length; index += 1) {
@@ -86,6 +104,202 @@ export function resolveScoreBlockColumns(plot: Plot) {
     return { value: 4, photo: 5, meta: 6 };
   }
   return { value: 8, photo: 9, meta: 10 };
+}
+
+export function resolveYieldBlockColumns(plot: Plot) {
+  if (plot === '1') {
+    return { mass: 0, moisture: 1, area: 2, yield: 3, meta: 4 };
+  }
+  if (plot === '2') {
+    return { mass: 6, moisture: 7, area: 8, yield: 9, meta: 10 };
+  }
+  return { mass: 12, moisture: 13, area: 14, yield: 15, meta: 16 };
+}
+
+function roundHalfToEven(value: number, fractionDigits: number) {
+  const factor = 10 ** fractionDigits;
+  const scaled = value * factor;
+  const floor = Math.floor(scaled);
+  const diff = scaled - floor;
+
+  if (Math.abs(diff - 0.5) < Number.EPSILON * 10) {
+    return (floor % 2 === 0 ? floor : floor + 1) / factor;
+  }
+
+  return Math.round(scaled) / factor;
+}
+
+function roundToThree(value: number) {
+  return Math.round(value * 1000) / 1000;
+}
+
+export function calculateYieldTonsPerHectare(
+  rawGrainMassKg: number,
+  moisturePercent: number,
+  areaSquareMeters: number,
+) {
+  const normalizedMassKg =
+    (rawGrainMassKg * (100 - moisturePercent)) / (100 - 14);
+  return roundToThree(normalizedMassKg / areaSquareMeters / 10000);
+}
+
+export function calculateActualDifference(left: number, right: number) {
+  return roundHalfToEven(Math.abs(left - right), 2);
+}
+
+export function calculateAllowedDifference(sumWeight: number) {
+  const roundedSum = Math.round(sumWeight);
+  const hundreds = Math.floor(roundedSum / 100);
+  const remainder = roundedSum % 100;
+  const tens = Math.floor(remainder / 10);
+  const units = remainder % 10;
+  const base = THOUSAND_SEED_WEIGHT_TOLERANCE_TABLE[tens]?.[units] ?? 0;
+
+  if (!hundreds) {
+    return roundHalfToEven(base, 2);
+  }
+
+  const hundredBase = (THOUSAND_SEED_WEIGHT_TOLERANCE_TABLE[hundreds]?.[0] ?? 0) * 10;
+  return roundHalfToEven(base + hundredBase, 2);
+}
+
+export function roundThousandSeedWeightByGost(value: number) {
+  return roundHalfToEven(value, value > 10 ? 1 : 2);
+}
+
+function formatDecimal(value: number, fractionDigits: number) {
+  return value.toFixed(fractionDigits);
+}
+
+function formatLabMeta(email: string | undefined, timestamp?: string) {
+  const now = timestamp ? new Date(timestamp) : new Date();
+  const day = `${String(now.getDate()).padStart(2, '0')}.${String(now.getMonth() + 1).padStart(2, '0')}.${now.getFullYear()}`;
+  const stamp = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')} ${day}`;
+  return `${stamp}, ${email || 'пользователь не указан'}`;
+}
+
+export function resolveThousandSeedWeightOutcome(
+  samples: { sample1Weight?: string; sample2Weight?: string; sample3Weight?: string },
+  selectedPair?: SeedWeightPair,
+) {
+  const parsed = {
+    sample1Weight: Number(samples.sample1Weight),
+    sample2Weight: Number(samples.sample2Weight),
+    sample3Weight: Number(samples.sample3Weight),
+  };
+  const hasFirstTwo =
+    samples.sample1Weight?.trim() &&
+    samples.sample2Weight?.trim() &&
+    Number.isFinite(parsed.sample1Weight) &&
+    Number.isFinite(parsed.sample2Weight) &&
+    parsed.sample1Weight > 0 &&
+    parsed.sample2Weight > 0;
+
+  if (!hasFirstTwo) {
+    return {
+      requiresThirdSample: false,
+      candidatePairs: [] as CandidatePairResult[],
+      selectedPair: undefined as SeedWeightPair | undefined,
+      analysisStatus: 'valid' as const,
+      sumWeight: '',
+      actualDifference: '',
+      allowedDifference: '',
+      finalWeight: '',
+      isComplete: false,
+    };
+  }
+
+  const buildPair = (pair: SeedWeightPair, left: number, right: number): CandidatePairResult => {
+    const sumWeight = roundHalfToEven(left + right, 2);
+    const actualDifference = calculateActualDifference(left, right);
+    const allowedDifference = calculateAllowedDifference(sumWeight);
+    return {
+      pair,
+      sumWeight,
+      actualDifference,
+      allowedDifference,
+      isAllowed: actualDifference <= allowedDifference,
+      finalWeight: roundThousandSeedWeightByGost(sumWeight),
+    };
+  };
+
+  const pair12 = buildPair('1+2', parsed.sample1Weight, parsed.sample2Weight);
+  const hasThirdSample =
+    samples.sample3Weight?.trim() &&
+    Number.isFinite(parsed.sample3Weight) &&
+    parsed.sample3Weight > 0;
+
+  if (pair12.isAllowed) {
+    return {
+      requiresThirdSample: false,
+      candidatePairs: [pair12],
+      selectedPair: '1+2' as const,
+      analysisStatus: 'valid' as const,
+      sumWeight: formatDecimal(pair12.sumWeight, 2),
+      actualDifference: formatDecimal(pair12.actualDifference, 2),
+      allowedDifference: formatDecimal(pair12.allowedDifference, 2),
+      finalWeight: formatDecimal(pair12.finalWeight, pair12.finalWeight > 10 ? 1 : 2),
+      isComplete: true,
+    };
+  }
+
+  if (!hasThirdSample) {
+    return {
+      requiresThirdSample: true,
+      candidatePairs: [pair12],
+      selectedPair: undefined,
+      analysisStatus: 'valid' as const,
+      sumWeight: formatDecimal(pair12.sumWeight, 2),
+      actualDifference: formatDecimal(pair12.actualDifference, 2),
+      allowedDifference: formatDecimal(pair12.allowedDifference, 2),
+      finalWeight: '',
+      isComplete: false,
+    };
+  }
+
+  const pair13 = buildPair('1+3', parsed.sample1Weight, parsed.sample3Weight);
+  const pair23 = buildPair('2+3', parsed.sample2Weight, parsed.sample3Weight);
+  const candidatePairs = [pair12, pair13, pair23];
+  const validPairs = candidatePairs.filter((pair) => pair.isAllowed);
+
+  if (!validPairs.length) {
+    return {
+      requiresThirdSample: true,
+      candidatePairs,
+      selectedPair: undefined,
+      analysisStatus: 'invalid' as const,
+      sumWeight: '',
+      actualDifference: '',
+      allowedDifference: '',
+      finalWeight: '',
+      isComplete: true,
+    };
+  }
+
+  const nextSelectedPair =
+    validPairs.length === 1
+      ? validPairs[0].pair
+      : selectedPair && validPairs.some((pair) => pair.pair === selectedPair)
+        ? selectedPair
+        : undefined;
+  const selectedResult = nextSelectedPair
+    ? validPairs.find((pair) => pair.pair === nextSelectedPair)
+    : undefined;
+
+  return {
+    requiresThirdSample: true,
+    candidatePairs,
+    selectedPair: nextSelectedPair,
+    analysisStatus: 'valid' as const,
+    sumWeight: selectedResult ? formatDecimal(selectedResult.sumWeight, 2) : '',
+    actualDifference: selectedResult ? formatDecimal(selectedResult.actualDifference, 2) : '',
+    allowedDifference: selectedResult ? formatDecimal(selectedResult.allowedDifference, 2) : '',
+    finalWeight:
+      selectedResult
+        ? formatDecimal(selectedResult.finalWeight, selectedResult.finalWeight > 10 ? 1 : 2)
+        : '',
+    isComplete: Boolean(selectedResult),
+  };
 }
 
 export function findFirstDiseaseRow(sheet: (string | number | boolean)[][], plot: Plot) {
@@ -225,6 +439,29 @@ export interface StructureSamplingStepWriteResult {
   rowsWritten: number;
 }
 
+export interface YieldStepWriteInput {
+  plots: Record<'1' | '2' | '3', YieldPlotDraft>;
+  userEmail?: string;
+}
+
+export interface YieldStepWriteResult {
+  workbook: Workbook;
+  sheetName: string;
+  rowIndex: number;
+}
+
+export interface ThousandSeedWeightStepWriteInput {
+  draft: ThousandSeedWeightDraft;
+  userEmail?: string;
+  completedAt?: string;
+}
+
+export interface ThousandSeedWeightStepWriteResult {
+  workbook: Workbook;
+  sheetName: string;
+  rowIndex: number;
+}
+
 export interface TemplateService {
   createVarietyWorkbook(draft: VarietyCreationDraft): Workbook;
   buildCreationWrites(draft: VarietyCreationDraft): SheetWriteOperation[];
@@ -255,6 +492,16 @@ export interface TemplateService {
     logicalSheetKey: ScoreSheetKey,
     input: ScoreStepWriteInput,
   ): ScoreStepWriteResult;
+  applyYieldStepWrite(
+    workbook: Workbook,
+    logicalSheetKey: YieldSheetKey,
+    input: YieldStepWriteInput,
+  ): YieldStepWriteResult;
+  applyThousandSeedWeightStepWrite(
+    workbook: Workbook,
+    logicalSheetKey: ThousandSeedWeightSheetKey,
+    input: ThousandSeedWeightStepWriteInput,
+  ): ThousandSeedWeightStepWriteResult;
   appendStructureSamplingStepWrite(
     workbook: Workbook,
     logicalSheetKey: StructureSheetKey,
@@ -424,6 +671,67 @@ class WorkbookTemplateService implements TemplateService {
         plotState.capturedAt,
       );
     });
+
+    workbook[sheetName] = sheet;
+    return {
+      workbook,
+      sheetName,
+      rowIndex: DATA_START_ROW_INDEX,
+    };
+  }
+
+  applyYieldStepWrite(
+    workbook: Workbook,
+    logicalSheetKey: YieldSheetKey,
+    input: YieldStepWriteInput,
+  ): YieldStepWriteResult {
+    const sheetName = SHEET_ALIASES[logicalSheetKey].local;
+    const sheet = workbook[sheetName]
+      ? sheetClone(workbook[sheetName])
+      : cloneSheet(TEMPLATE_SHEETS[sheetName]);
+
+    (['1', '2', '3'] as const).forEach((plot) => {
+      const plotState = input.plots[plot];
+      const { mass, moisture, area, yield: yieldColumn, meta } = resolveYieldBlockColumns(plot);
+      ensureCell(sheet, DATA_START_ROW_INDEX, meta);
+      sheet[DATA_START_ROW_INDEX][mass] = plotState.rawGrainMassKg || '';
+      sheet[DATA_START_ROW_INDEX][moisture] = plotState.moisturePercent || '';
+      sheet[DATA_START_ROW_INDEX][area] = plotState.areaSquareMeters;
+      sheet[DATA_START_ROW_INDEX][yieldColumn] = plotState.yieldTonsPerHectare || '';
+      sheet[DATA_START_ROW_INDEX][meta] = formatPhotoMeta(input.userEmail, undefined, undefined);
+    });
+
+    workbook[sheetName] = sheet;
+    return {
+      workbook,
+      sheetName,
+      rowIndex: DATA_START_ROW_INDEX,
+    };
+  }
+
+  applyThousandSeedWeightStepWrite(
+    workbook: Workbook,
+    logicalSheetKey: ThousandSeedWeightSheetKey,
+    input: ThousandSeedWeightStepWriteInput,
+  ): ThousandSeedWeightStepWriteResult {
+    const sheetName = SHEET_ALIASES[logicalSheetKey].local;
+    const sheet = workbook[sheetName]
+      ? sheetClone(workbook[sheetName])
+      : cloneSheet(TEMPLATE_SHEETS[sheetName]);
+
+    ensureCell(sheet, DATA_START_ROW_INDEX, 10);
+    sheet[DATA_START_ROW_INDEX][0] = 'средняя проба';
+    sheet[DATA_START_ROW_INDEX][1] = input.draft.sample1Weight || '';
+    sheet[DATA_START_ROW_INDEX][2] = input.draft.sample2Weight || '';
+    sheet[DATA_START_ROW_INDEX][3] = input.draft.sample3Weight || '';
+    sheet[DATA_START_ROW_INDEX][4] = input.draft.selectedPair || '';
+    sheet[DATA_START_ROW_INDEX][5] = input.draft.sumWeight || '';
+    sheet[DATA_START_ROW_INDEX][6] = input.draft.actualDifference || '';
+    sheet[DATA_START_ROW_INDEX][7] = input.draft.allowedDifference || '';
+    sheet[DATA_START_ROW_INDEX][8] =
+      input.draft.analysisStatus === 'valid' ? input.draft.finalWeight || '' : '';
+    sheet[DATA_START_ROW_INDEX][9] = input.draft.analysisStatus;
+    sheet[DATA_START_ROW_INDEX][10] = formatLabMeta(input.userEmail, input.completedAt);
 
     workbook[sheetName] = sheet;
     return {

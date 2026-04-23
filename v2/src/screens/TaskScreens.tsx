@@ -23,8 +23,11 @@ import {
   InspectionCardDraft,
   PhenologyPlotDraft,
   ScorePlotDraft,
+  SeedWeightPair,
   StructurePlantCardDraft,
   StructureSamplingDraft,
+  ThousandSeedWeightDraft,
+  YieldPlotDraft,
 } from '../types/app';
 
 function useTaskData(varietyId: string, taskCode: string) {
@@ -59,6 +62,8 @@ function returnToVariety(
     | NativeStackScreenProps<V2RootStackParamList, 'FusariumCards'>['navigation']
     | NativeStackScreenProps<V2RootStackParamList, 'ChoiceTask'>['navigation']
     | NativeStackScreenProps<V2RootStackParamList, 'ScoreTask'>['navigation']
+    | NativeStackScreenProps<V2RootStackParamList, 'YieldTask'>['navigation']
+    | NativeStackScreenProps<V2RootStackParamList, 'ThousandSeedWeightTask'>['navigation']
     | NativeStackScreenProps<V2RootStackParamList, 'PhenologyTask'>['navigation']
     | NativeStackScreenProps<V2RootStackParamList, 'StructureSamplingTask'>['navigation']
     | NativeStackScreenProps<V2RootStackParamList, 'MeasurementTask'>['navigation']
@@ -111,6 +116,29 @@ function getScoreStatusLabel(plot: ScorePlotDraft) {
     return 'Готово';
   }
   if (plot.photoUri || plot.selectedScore) {
+    return 'Черновик';
+  }
+  return 'Не начато';
+}
+
+function getYieldStatusLabel(plot: YieldPlotDraft) {
+  if (plot.isComplete) {
+    return 'Готово';
+  }
+  if (plot.rawGrainMassKg || plot.moisturePercent) {
+    return 'Черновик';
+  }
+  return 'Не начато';
+}
+
+function getThousandSeedWeightStatusLabel(draft: ThousandSeedWeightDraft) {
+  if (draft.analysisStatus === 'invalid' && draft.isComplete) {
+    return 'Ошибка анализа';
+  }
+  if (draft.isComplete) {
+    return 'Готово';
+  }
+  if (draft.sample1Weight || draft.sample2Weight || draft.sample3Weight) {
     return 'Черновик';
   }
   return 'Не начато';
@@ -656,6 +684,263 @@ export function ScoreTaskScreen({
         })}
         {!locked ? (
           <Button label={v2Copy.completeStep} onPress={() => void saveStep()} />
+        ) : (
+          <Button
+            label={v2Copy.returnToVariety}
+            variant="secondary"
+            onPress={() => returnToVariety(navigation, variety.id)}
+          />
+        )}
+        <Button label={v2Copy.back} variant="ghost" onPress={() => navigation.goBack()} />
+      </Card>
+    </Screen>
+  );
+}
+
+export function YieldTaskScreen({
+  route,
+  navigation,
+}: NativeStackScreenProps<V2RootStackParamList, 'YieldTask'>) {
+  const {
+    variety,
+    task,
+    taskDef,
+    updateYieldPlot,
+    completeTaskLocally,
+    queueTaskSubmission,
+  } = useTaskData(route.params.varietyId, route.params.taskCode);
+
+  if (!variety || !taskDef || !task.yieldPlots) {
+    return null;
+  }
+
+  const locked = Boolean(task.completedAt);
+
+  const saveStep = async () => {
+    try {
+      completeTaskLocally(variety.id, task.code);
+      await queueTaskSubmission(variety.id, task.code);
+      Alert.alert(v2Copy.doneTitle, v2Copy.taskQueuedDone);
+      returnToVariety(navigation, variety.id);
+    } catch (error) {
+      Alert.alert(
+        v2Copy.errorTitle,
+        error instanceof Error ? error.message : v2Copy.completeStepFailed,
+      );
+    }
+  };
+
+  return (
+    <Screen>
+      <TaskHeader title={task.title} subtitle={variety.title} intro={task.intro || ''} />
+      <TaskSamples taskCode={task.code} />
+      <Card>
+        <Text style={uiStyles.paragraph}>{taskDef.criterionText || ''}</Text>
+        {locked ? (
+          <Text style={uiStyles.paragraph}>Шаг сохранен и доступен только для просмотра.</Text>
+        ) : null}
+      </Card>
+      <Card>
+        {(['1', '2', '3'] as const).map((plot) => {
+          const plotState = task.yieldPlots?.[plot];
+          if (!plotState) {
+            return null;
+          }
+
+          return (
+            <View key={plot} style={{ gap: 8, paddingBottom: 16 }}>
+              <Text style={uiStyles.paragraph}>
+                {v2Copy.taskPlot} {plot} - {getYieldStatusLabel(plotState)}
+              </Text>
+              <Field
+                label="Масса сырого зерна, кг"
+                value={plotState.rawGrainMassKg || ''}
+                editable={!locked}
+                keyboardType="numeric"
+                onChangeText={(value) =>
+                  updateYieldPlot(variety.id, task.code, plot, {
+                    rawGrainMassKg: value,
+                  })
+                }
+              />
+              <Field
+                label="Влажность зерна, %"
+                value={plotState.moisturePercent || ''}
+                editable={!locked}
+                keyboardType="numeric"
+                onChangeText={(value) =>
+                  updateYieldPlot(variety.id, task.code, plot, {
+                    moisturePercent: value,
+                  })
+                }
+              />
+              <Field
+                label="Площадь делянки, м²"
+                value={String(plotState.areaSquareMeters)}
+                editable={false}
+                onChangeText={() => {}}
+              />
+              <Field
+                label="Урожайность, т/га"
+                value={plotState.yieldTonsPerHectare || ''}
+                editable={false}
+                onChangeText={() => {}}
+              />
+            </View>
+          );
+        })}
+        {!locked ? (
+          <Button label={v2Copy.completeStep} onPress={() => void saveStep()} />
+        ) : (
+          <Button
+            label={v2Copy.returnToVariety}
+            variant="secondary"
+            onPress={() => returnToVariety(navigation, variety.id)}
+          />
+        )}
+        <Button label={v2Copy.back} variant="ghost" onPress={() => navigation.goBack()} />
+      </Card>
+    </Screen>
+  );
+}
+
+export function ThousandSeedWeightTaskScreen({
+  route,
+  navigation,
+}: NativeStackScreenProps<V2RootStackParamList, 'ThousandSeedWeightTask'>) {
+  const {
+    variety,
+    task,
+    taskDef,
+    updateThousandSeedWeight,
+    selectThousandSeedWeightPair,
+    completeTaskLocally,
+    queueTaskSubmission,
+  } = useTaskData(route.params.varietyId, route.params.taskCode);
+
+  if (!variety || !taskDef || !task.thousandSeedWeight) {
+    return null;
+  }
+
+  const locked = Boolean(task.completedAt);
+  const draft = task.thousandSeedWeight;
+  const validPairs = draft.candidatePairs.filter((pair) => pair.isAllowed);
+
+  const saveStep = async () => {
+    try {
+      completeTaskLocally(variety.id, task.code);
+      await queueTaskSubmission(variety.id, task.code);
+      Alert.alert(
+        v2Copy.doneTitle,
+        draft.analysisStatus === 'invalid'
+          ? 'Шаг сохранен как ошибка анализа и поставлен в локальную очередь.'
+          : v2Copy.taskQueuedDone,
+      );
+      returnToVariety(navigation, variety.id);
+    } catch (error) {
+      Alert.alert(
+        v2Copy.errorTitle,
+        error instanceof Error ? error.message : v2Copy.completeStepFailed,
+      );
+    }
+  };
+
+  const setWeight =
+    (field: 'sample1Weight' | 'sample2Weight' | 'sample3Weight') =>
+    (value: string) =>
+      updateThousandSeedWeight(variety.id, task.code, { [field]: value } as Partial<ThousandSeedWeightDraft>);
+
+  return (
+    <Screen>
+      <TaskHeader title={task.title} subtitle={variety.title} intro={task.intro || ''} />
+      <TaskSamples taskCode={task.code} />
+      <Card>
+        <Text style={uiStyles.paragraph}>{taskDef.criterionText || ''}</Text>
+        <Text style={uiStyles.paragraph}>
+          {`Статус шага: ${getThousandSeedWeightStatusLabel(draft)}`}
+        </Text>
+      </Card>
+      <Card>
+        <Field
+          label="Масса пробы 1, г"
+          value={draft.sample1Weight || ''}
+          editable={!locked}
+          keyboardType="numeric"
+          onChangeText={setWeight('sample1Weight')}
+        />
+        <Field
+          label="Масса пробы 2, г"
+          value={draft.sample2Weight || ''}
+          editable={!locked}
+          keyboardType="numeric"
+          onChangeText={setWeight('sample2Weight')}
+        />
+        {draft.requiresThirdSample ? (
+          <Field
+            label="Масса пробы 3, г"
+            value={draft.sample3Weight || ''}
+            editable={!locked}
+            keyboardType="numeric"
+            onChangeText={setWeight('sample3Weight')}
+          />
+        ) : null}
+        <Field
+          label="Суммарная масса выбранной пары, г"
+          value={draft.sumWeight || ''}
+          editable={false}
+          onChangeText={() => {}}
+        />
+        <Field
+          label="Фактическое расхождение, г"
+          value={draft.actualDifference || ''}
+          editable={false}
+          onChangeText={() => {}}
+        />
+        <Field
+          label="Допустимое расхождение, г"
+          value={draft.allowedDifference || ''}
+          editable={false}
+          onChangeText={() => {}}
+        />
+        <Field
+          label="Масса 1000 семян, г"
+          value={draft.finalWeight || ''}
+          editable={false}
+          onChangeText={() => {}}
+        />
+        {draft.requiresThirdSample && validPairs.length > 1 ? (
+          <View style={{ gap: 8 }}>
+            <Text style={uiStyles.paragraph}>Выберите итоговую пару проб</Text>
+            <View style={{ flexDirection: 'row', gap: 8 }}>
+              {validPairs.map((pair) => (
+                <View key={pair.pair} style={{ flex: 1 }}>
+                  <Button
+                    label={pair.pair}
+                    variant={draft.selectedPair === pair.pair ? 'primary' : 'secondary'}
+                    disabled={locked}
+                    onPress={() =>
+                      selectThousandSeedWeightPair(variety.id, task.code, pair.pair as SeedWeightPair)
+                    }
+                  />
+                </View>
+              ))}
+            </View>
+          </View>
+        ) : null}
+        {draft.requiresThirdSample && !validPairs.length ? (
+          <Text style={uiStyles.paragraph}>
+            Допустимая пара проб не найдена. Шаг можно сохранить как ошибку анализа.
+          </Text>
+        ) : null}
+        {!locked ? (
+          <Button
+            label={
+              draft.analysisStatus === 'invalid'
+                ? 'Завершить шаг с ошибкой'
+                : v2Copy.completeStep
+            }
+            onPress={() => void saveStep()}
+          />
         ) : (
           <Button
             label={v2Copy.returnToVariety}

@@ -16,9 +16,14 @@ import { clipboardService } from '../services/clipboardService';
 import { locationService } from '../services/locationService';
 import { isInternetReachable, subscribeToNetwork } from '../services/networkService';
 import { isValidGoogleSheetsUrl } from '../services/sheetsService';
-import { templateService } from '../services/templateService';
+import {
+  calculateYieldTonsPerHectare,
+  resolveThousandSeedWeightOutcome,
+  templateService,
+} from '../services/templateService';
 import {
   AuthMode,
+  CandidatePairResult,
   ChoicePlotDraft,
   ChoiceSheetKey,
   DiseaseSheetKey,
@@ -31,10 +36,15 @@ import {
   QueuedOperation,
   ScorePlotDraft,
   ScoreSheetKey,
+  SeedWeightPair,
   StructurePlantCardDraft,
   StructureSamplingDraft,
   StructureSheetKey,
   TaskUiStatus,
+  ThousandSeedWeightDraft,
+  ThousandSeedWeightSheetKey,
+  YieldPlotDraft,
+  YieldSheetKey,
   VarietyCreationDraft,
   VarietyRecord,
 } from '../types/app';
@@ -108,6 +118,8 @@ function isTaskQueueEntry(item: QueuedOperation, varietyId: string, taskCode: st
     (payload.kind === 'phenology_step' ||
       payload.kind === 'choice_step' ||
       payload.kind === 'score_step' ||
+      payload.kind === 'yield_step' ||
+      payload.kind === 'thousand_seed_weight_step' ||
       payload.kind === 'structure_sampling_step')
   );
 }
@@ -227,6 +239,56 @@ function getTaskUiStatus(
     return 'draft';
   }
 
+  if (task.flowKind === 'yield_by_plot') {
+    const [taskQueue] = getTaskQueueEntries(queue, varietyId, task.code);
+
+    if (taskQueue?.status === 'synced') {
+      return 'processed';
+    }
+
+    if (taskQueue && ['queued', 'processing', 'failed'].includes(taskQueue.status)) {
+      return 'queued';
+    }
+
+    if (task.completedAt) {
+      return 'ready_local';
+    }
+
+    const plots = task.yieldPlots ? Object.values(task.yieldPlots) : [];
+    if (!plots.some((plot) => plot.rawGrainMassKg || plot.moisturePercent)) {
+      return 'not_started';
+    }
+
+    return 'draft';
+  }
+
+  if (task.flowKind === 'thousand_seed_weight_step') {
+    const [taskQueue] = getTaskQueueEntries(queue, varietyId, task.code);
+
+    if (taskQueue?.status === 'synced') {
+      return task.thousandSeedWeight?.analysisStatus === 'invalid'
+        ? 'analysis_invalid'
+        : 'processed';
+    }
+
+    if (taskQueue && ['queued', 'processing', 'failed'].includes(taskQueue.status)) {
+      return 'queued';
+    }
+
+    if (task.completedAt) {
+      return task.thousandSeedWeight?.analysisStatus === 'invalid'
+        ? 'analysis_invalid'
+        : 'ready_local';
+    }
+
+    const draft = task.thousandSeedWeight;
+    if (!draft?.sample1Weight && !draft?.sample2Weight && !draft?.sample3Weight) {
+      return 'not_started';
+    }
+
+    return 'draft';
+  }
+
   if (task.flowKind === 'structure_by_sampling') {
     const [taskQueue] = getTaskQueueEntries(queue, varietyId, task.code);
 
@@ -313,6 +375,23 @@ function createEmptyScorePlots(): Record<'1' | '2' | '3', ScorePlotDraft> {
   };
 }
 
+function createEmptyYieldPlots(): Record<'1' | '2' | '3', YieldPlotDraft> {
+  return {
+    '1': { plot: '1', areaSquareMeters: 5, isComplete: false },
+    '2': { plot: '2', areaSquareMeters: 5, isComplete: false },
+    '3': { plot: '3', areaSquareMeters: 5, isComplete: false },
+  };
+}
+
+function createEmptyThousandSeedWeightDraft(): ThousandSeedWeightDraft {
+  return {
+    requiresThirdSample: false,
+    candidatePairs: [],
+    analysisStatus: 'valid',
+    isComplete: false,
+  };
+}
+
 function createEmptySamplings(): Record<'1' | '2', StructureSamplingDraft> {
   return {
     '1': { samplingId: '1', cards: [], isComplete: false },
@@ -344,6 +423,42 @@ function isScorePlotComplete(plot: ScorePlotDraft) {
       plot.selectedScore &&
       plot.capturedAt &&
       plot.capturedLocation?.mapsUrl,
+  );
+}
+
+function isYieldPlotComplete(plot: YieldPlotDraft) {
+  const mass = Number(plot.rawGrainMassKg);
+  const moisture = Number(plot.moisturePercent);
+  return Boolean(
+    plot.rawGrainMassKg?.trim() &&
+      plot.moisturePercent?.trim() &&
+      Number.isFinite(mass) &&
+      Number.isFinite(moisture) &&
+      mass > 0 &&
+      moisture >= 0 &&
+      moisture < 100 &&
+      plot.yieldTonsPerHectare,
+  );
+}
+
+function isThousandSeedWeightCompletable(draft: ThousandSeedWeightDraft | undefined) {
+  if (!draft) {
+    return false;
+  }
+
+  if (draft.analysisStatus === 'invalid') {
+    return Boolean(
+      draft.sample1Weight?.trim() &&
+        draft.sample2Weight?.trim() &&
+        draft.sample3Weight?.trim(),
+    );
+  }
+
+  return Boolean(
+    draft.sample1Weight?.trim() &&
+      draft.sample2Weight?.trim() &&
+      draft.isComplete &&
+      draft.finalWeight,
   );
 }
 
@@ -391,6 +506,11 @@ function finalizeTask(
         : task.flowKind === 'score_by_plot'
           ? Boolean(task.scorePlots) &&
             Object.values(task.scorePlots || {}).every(isScorePlotComplete)
+        : task.flowKind === 'yield_by_plot'
+          ? Boolean(task.yieldPlots) &&
+            Object.values(task.yieldPlots || {}).every(isYieldPlotComplete)
+        : task.flowKind === 'thousand_seed_weight_step'
+          ? isThousandSeedWeightCompletable(task.thousandSeedWeight)
         : task.flowKind === 'structure_by_sampling'
           ? Boolean(task.samplings) &&
             Object.values(task.samplings || {}).every(isSamplingComplete)
@@ -434,6 +554,11 @@ function createTaskFromDefinition(
       taskDef.flowKind === 'phenology_by_plot' ? createEmptyPhenologyPlots() : undefined,
     choicePlots: taskDef.flowKind === 'choice_by_plot' ? createEmptyChoicePlots() : undefined,
     scorePlots: taskDef.flowKind === 'score_by_plot' ? createEmptyScorePlots() : undefined,
+    yieldPlots: taskDef.flowKind === 'yield_by_plot' ? createEmptyYieldPlots() : undefined,
+    thousandSeedWeight:
+      taskDef.flowKind === 'thousand_seed_weight_step'
+        ? createEmptyThousandSeedWeightDraft()
+        : undefined,
     samplings: taskDef.flowKind === 'structure_by_sampling' ? createEmptySamplings() : undefined,
     updatedAt: new Date().toISOString(),
   };
@@ -515,6 +640,22 @@ interface V2ContextValue {
     taskCode: string,
     plot: '1' | '2' | '3',
     changes: Partial<ScorePlotDraft>,
+  ): void;
+  updateYieldPlot(
+    varietyId: string,
+    taskCode: string,
+    plot: '1' | '2' | '3',
+    changes: Partial<YieldPlotDraft>,
+  ): void;
+  updateThousandSeedWeight(
+    varietyId: string,
+    taskCode: string,
+    changes: Partial<ThousandSeedWeightDraft>,
+  ): void;
+  selectThousandSeedWeightPair(
+    varietyId: string,
+    taskCode: string,
+    pair: SeedWeightPair,
   ): void;
   updateSamplingPlot(
     varietyId: string,
@@ -925,6 +1066,175 @@ export function V2AppProvider({ children }: { children: ReactNode }) {
     });
   }
 
+  async function processYieldStepOperation(item: QueuedOperation) {
+    const payload = item.payload as Record<string, unknown>;
+    const varietyId = item.varietyId;
+    const taskCode = String(payload.taskCode || item.screenId || '');
+    const logicalSheetKey = payload.logicalSheetKey as YieldSheetKey | undefined;
+    const plots = payload.plots as Record<'1' | '2' | '3', YieldPlotDraft> | undefined;
+
+    if (!varietyId || !taskCode || !logicalSheetKey || !plots) {
+      throw new Error(v2Copy.localSyncError);
+    }
+
+    setState((current) => {
+      const variety = current.catalog.find((entry) => entry.id === varietyId);
+      if (!variety) {
+        throw new Error(v2Copy.varietyNotFound);
+      }
+
+      const workbook =
+        variety.setup?.localWorkbook || templateService.createLocalWorkbookCopy();
+      const nextWorkbook = JSON.parse(JSON.stringify(workbook)) as Record<
+        string,
+        (string | number | boolean)[][]
+      >;
+      const applied = templateService.applyYieldStepWrite(nextWorkbook, logicalSheetKey, {
+        plots,
+        userEmail: current.session?.email,
+      });
+
+      const nextQueue: QueuedOperation[] = current.syncQueue.map((entry) =>
+        entry.id === item.id
+          ? ({
+              ...entry,
+              status: 'synced',
+              updatedAt: new Date().toISOString(),
+              lastError: undefined,
+            } satisfies QueuedOperation)
+          : entry,
+      );
+
+      const task =
+        current.inspections[varietyId]?.[taskCode] ||
+        createTaskFromDefinition(varietyId, taskCode, nextQueue);
+      const nextTask: InspectionTask = {
+        ...task,
+        yieldPlots: plots,
+        cardsCompleted: true,
+        completedAt: task.completedAt || new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        uiStatus: 'processed',
+      };
+
+      return {
+        ...current,
+        syncQueue: nextQueue,
+        catalog: current.catalog.map((entry) =>
+          entry.id === varietyId
+            ? {
+                ...entry,
+                status: 'ready',
+                updatedAt: new Date().toISOString(),
+                lastError: undefined,
+                setup: {
+                  ...entry.setup,
+                  localWorkbook: applied.workbook,
+                },
+              }
+            : entry,
+        ),
+        inspections: {
+          ...current.inspections,
+          [varietyId]: {
+            ...current.inspections[varietyId],
+            [taskCode]: {
+              ...nextTask,
+              uiStatus: getTaskUiStatus(varietyId, nextTask, nextQueue),
+            },
+          },
+        },
+      };
+    });
+  }
+
+  async function processThousandSeedWeightStepOperation(item: QueuedOperation) {
+    const payload = item.payload as Record<string, unknown>;
+    const varietyId = item.varietyId;
+    const taskCode = String(payload.taskCode || item.screenId || '');
+    const logicalSheetKey = payload.logicalSheetKey as ThousandSeedWeightSheetKey | undefined;
+    const draft = payload.draft as ThousandSeedWeightDraft | undefined;
+
+    if (!varietyId || !taskCode || !logicalSheetKey || !draft) {
+      throw new Error(v2Copy.localSyncError);
+    }
+
+    setState((current) => {
+      const variety = current.catalog.find((entry) => entry.id === varietyId);
+      if (!variety) {
+        throw new Error(v2Copy.varietyNotFound);
+      }
+
+      const workbook =
+        variety.setup?.localWorkbook || templateService.createLocalWorkbookCopy();
+      const nextWorkbook = JSON.parse(JSON.stringify(workbook)) as Record<
+        string,
+        (string | number | boolean)[][]
+      >;
+      const task =
+        current.inspections[varietyId]?.[taskCode] ||
+        createTaskFromDefinition(varietyId, taskCode, current.syncQueue);
+      const applied = templateService.applyThousandSeedWeightStepWrite(
+        nextWorkbook,
+        logicalSheetKey,
+        {
+          draft,
+          userEmail: current.session?.email,
+          completedAt: task.completedAt,
+        },
+      );
+
+      const nextQueue: QueuedOperation[] = current.syncQueue.map((entry) =>
+        entry.id === item.id
+          ? ({
+              ...entry,
+              status: 'synced',
+              updatedAt: new Date().toISOString(),
+              lastError: undefined,
+            } satisfies QueuedOperation)
+          : entry,
+      );
+
+      const nextTask: InspectionTask = {
+        ...task,
+        thousandSeedWeight: draft,
+        cardsCompleted: true,
+        completedAt: task.completedAt || new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        uiStatus: draft.analysisStatus === 'invalid' ? 'analysis_invalid' : 'processed',
+      };
+
+      return {
+        ...current,
+        syncQueue: nextQueue,
+        catalog: current.catalog.map((entry) =>
+          entry.id === varietyId
+            ? {
+                ...entry,
+                status: 'ready',
+                updatedAt: new Date().toISOString(),
+                lastError: undefined,
+                setup: {
+                  ...entry.setup,
+                  localWorkbook: applied.workbook,
+                },
+              }
+            : entry,
+        ),
+        inspections: {
+          ...current.inspections,
+          [varietyId]: {
+            ...current.inspections[varietyId],
+            [taskCode]: {
+              ...nextTask,
+              uiStatus: getTaskUiStatus(varietyId, nextTask, nextQueue),
+            },
+          },
+        },
+      };
+    });
+  }
+
   async function processStructureSamplingStepOperation(item: QueuedOperation) {
     const payload = item.payload as Record<string, unknown>;
     const varietyId = item.varietyId;
@@ -1057,6 +1367,22 @@ export function V2AppProvider({ children }: { children: ReactNode }) {
           (item.payload as Record<string, unknown>).kind === 'score_step'
         ) {
           await processScoreStepOperation(item);
+          continue;
+        }
+
+        if (
+          item.type === 'write_sheet' &&
+          (item.payload as Record<string, unknown>).kind === 'yield_step'
+        ) {
+          await processYieldStepOperation(item);
+          continue;
+        }
+
+        if (
+          item.type === 'write_sheet' &&
+          (item.payload as Record<string, unknown>).kind === 'thousand_seed_weight_step'
+        ) {
+          await processThousandSeedWeightStepOperation(item);
           continue;
         }
 
@@ -1559,6 +1885,91 @@ export function V2AppProvider({ children }: { children: ReactNode }) {
           scorePlots: nextPlots,
         });
       },
+      updateYieldPlot(varietyId, taskCode, plot, changes) {
+        const currentTask = getTaskInternal(varietyId, taskCode);
+        if (currentTask.flowKind !== 'yield_by_plot' || currentTask.completedAt) {
+          return;
+        }
+
+        const nextPlots = {
+          ...(currentTask.yieldPlots || createEmptyYieldPlots()),
+          [plot]: {
+            ...(currentTask.yieldPlots?.[plot] || {
+              plot,
+              areaSquareMeters: 5,
+              isComplete: false,
+            }),
+            ...changes,
+          },
+        } as Record<'1' | '2' | '3', YieldPlotDraft>;
+
+        const currentPlot = nextPlots[plot];
+        const mass = Number(currentPlot.rawGrainMassKg);
+        const moisture = Number(currentPlot.moisturePercent);
+        const isValid =
+          currentPlot.rawGrainMassKg?.trim() &&
+          currentPlot.moisturePercent?.trim() &&
+          Number.isFinite(mass) &&
+          Number.isFinite(moisture) &&
+          mass > 0 &&
+          moisture >= 0 &&
+          moisture < 100;
+
+        nextPlots[plot] = {
+          ...currentPlot,
+          areaSquareMeters: 5,
+          yieldTonsPerHectare: isValid
+            ? calculateYieldTonsPerHectare(mass, moisture, 5).toFixed(3)
+            : '',
+          isComplete: isValid ? isYieldPlotComplete({
+            ...currentPlot,
+            areaSquareMeters: 5,
+            yieldTonsPerHectare: calculateYieldTonsPerHectare(mass, moisture, 5).toFixed(3),
+          }) : false,
+        };
+
+        saveDraftTask(varietyId, taskCode, {
+          ...currentTask,
+          yieldPlots: nextPlots,
+        });
+      },
+      updateThousandSeedWeight(varietyId, taskCode, changes) {
+        const currentTask = getTaskInternal(varietyId, taskCode);
+        if (currentTask.flowKind !== 'thousand_seed_weight_step' || currentTask.completedAt) {
+          return;
+        }
+
+        const nextDraft = {
+          ...(currentTask.thousandSeedWeight || createEmptyThousandSeedWeightDraft()),
+          ...changes,
+        } as ThousandSeedWeightDraft;
+        const resolved = resolveThousandSeedWeightOutcome(nextDraft, nextDraft.selectedPair);
+
+        saveDraftTask(varietyId, taskCode, {
+          ...currentTask,
+          thousandSeedWeight: {
+            ...nextDraft,
+            ...resolved,
+          },
+        });
+      },
+      selectThousandSeedWeightPair(varietyId, taskCode, pair) {
+        const currentTask = getTaskInternal(varietyId, taskCode);
+        if (currentTask.flowKind !== 'thousand_seed_weight_step' || currentTask.completedAt) {
+          return;
+        }
+
+        const currentDraft = currentTask.thousandSeedWeight || createEmptyThousandSeedWeightDraft();
+        const resolved = resolveThousandSeedWeightOutcome(currentDraft, pair);
+
+        saveDraftTask(varietyId, taskCode, {
+          ...currentTask,
+          thousandSeedWeight: {
+            ...currentDraft,
+            ...resolved,
+          },
+        });
+      },
       updateSamplingPlot(varietyId, taskCode, samplingId, plot) {
         const currentTask = getTaskInternal(varietyId, taskCode);
         if (currentTask.flowKind !== 'structure_by_sampling' || currentTask.completedAt) {
@@ -1837,6 +2248,17 @@ export function V2AppProvider({ children }: { children: ReactNode }) {
           ) {
             throw new Error(v2Copy.taskOverviewRequired);
           }
+        } else if (currentTask.flowKind === 'yield_by_plot') {
+          if (
+            !currentTask.yieldPlots ||
+            !Object.values(currentTask.yieldPlots).every(isYieldPlotComplete)
+          ) {
+            throw new Error(v2Copy.taskMeasurementRequired);
+          }
+        } else if (currentTask.flowKind === 'thousand_seed_weight_step') {
+          if (!isThousandSeedWeightCompletable(currentTask.thousandSeedWeight)) {
+            throw new Error(v2Copy.taskMeasurementRequired);
+          }
         } else if (currentTask.flowKind === 'structure_by_sampling') {
           if (
             !currentTask.samplings ||
@@ -1879,6 +2301,8 @@ export function V2AppProvider({ children }: { children: ReactNode }) {
             task.flowKind === 'phenology_by_plot' ||
             task.flowKind === 'choice_by_plot' ||
             task.flowKind === 'score_by_plot' ||
+            task.flowKind === 'yield_by_plot' ||
+            task.flowKind === 'thousand_seed_weight_step' ||
             task.flowKind === 'structure_by_sampling'
           ) &&
           !taskDef?.logicalSheetKey
@@ -1957,6 +2381,44 @@ export function V2AppProvider({ children }: { children: ReactNode }) {
                         localUri: plot.photoUri as string,
                         mimeType: 'image/jpeg' as const,
                       })),
+                  }
+              : task.flowKind === 'yield_by_plot'
+                ? {
+                    id: createId('queue'),
+                    type: 'write_sheet',
+                    varietyId,
+                    screenId: taskCode,
+                    status: 'queued',
+                    idempotencyKey: `${variety.binding.spreadsheetId}:${taskCode}:${task.updatedAt}`,
+                    createdAt: new Date().toISOString(),
+                    updatedAt: new Date().toISOString(),
+                    retryCount: 0,
+                    payload: {
+                      kind: 'yield_step',
+                      taskCode,
+                      logicalSheetKey: taskDef.logicalSheetKey,
+                      plots: task.yieldPlots,
+                    },
+                    media: [],
+                  }
+              : task.flowKind === 'thousand_seed_weight_step'
+                ? {
+                    id: createId('queue'),
+                    type: 'write_sheet',
+                    varietyId,
+                    screenId: taskCode,
+                    status: 'queued',
+                    idempotencyKey: `${variety.binding.spreadsheetId}:${taskCode}:${task.updatedAt}`,
+                    createdAt: new Date().toISOString(),
+                    updatedAt: new Date().toISOString(),
+                    retryCount: 0,
+                    payload: {
+                      kind: 'thousand_seed_weight_step',
+                      taskCode,
+                      logicalSheetKey: taskDef.logicalSheetKey,
+                      draft: task.thousandSeedWeight,
+                    },
+                    media: [],
                   }
               : task.flowKind === 'structure_by_sampling'
                 ? {
