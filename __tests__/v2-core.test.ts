@@ -8,6 +8,7 @@ import {
   buildDiseaseCellValue,
   findFirstDiseaseRow,
   recountDiseaseCards,
+  resolveProteinToleranceStatus,
   resolveThousandSeedWeightOutcome,
   resolveChoiceBlockColumns,
   resolveDiseaseBlockColumns,
@@ -546,6 +547,61 @@ describe('v2 core helpers', () => {
     expect(String(applied.workbook['27.Масса 1000 семян'][2][10])).toContain('sample@mail.com');
   });
 
+  it('resolves protein tolerance and writes protein content into a fixed workbook row', () => {
+    expect(resolveProteinToleranceStatus('300')).toBe('valid');
+    expect(resolveProteinToleranceStatus('299.9')).toBe('valid');
+    expect(resolveProteinToleranceStatus('300.1')).toBe('valid');
+    expect(resolveProteinToleranceStatus('299.8')).toBe('out_of_tolerance');
+
+    const workbook = templateService.createLocalWorkbookCopy();
+    const applied = templateService.applyProteinContentStepWrite(workbook, 'protein_content_sheet', {
+      userEmail: 'sample@mail.com',
+      completedAt: '2026-04-23T10:15:00.000Z',
+      draft: {
+        sampleSource: 'средняя проба',
+        sampleMassGrams: '299.8',
+        analysisMethod: 'Инфракрасный анализатор',
+        proteinPercent: '38.6',
+        sampleToleranceStatus: 'out_of_tolerance',
+        isComplete: true,
+      },
+    });
+
+    expect(applied.sheetName).toBe(taskDefinitionsByCode['28'].localSheetName);
+    expect(applied.rowIndex).toBe(2);
+    expect(applied.workbook[applied.sheetName][2][0]).toBe('средняя проба');
+    expect(applied.workbook[applied.sheetName][2][1]).toBe('299.8');
+    expect(applied.workbook[applied.sheetName][2][2]).toBe('Инфракрасный анализатор');
+    expect(applied.workbook[applied.sheetName][2][3]).toBe('38.6');
+    expect(applied.workbook[applied.sheetName][2][4]).toBe('out_of_tolerance');
+    expect(String(applied.workbook[applied.sheetName][2][5])).toContain('sample@mail.com');
+  });
+
+  it('writes fat content into a fixed workbook row', () => {
+    const workbook = templateService.createLocalWorkbookCopy();
+    const applied = templateService.applyFatContentStepWrite(workbook, 'fat_content_sheet', {
+      userEmail: 'sample@mail.com',
+      completedAt: '2026-04-23T10:15:00.000Z',
+      draft: {
+        sampleSource: 'средняя проба',
+        sampleMassGrams: '300.2',
+        analysisMethod: 'Инфракрасный анализатор',
+        fatPercent: '19.4',
+        sampleToleranceStatus: 'out_of_tolerance',
+        isComplete: true,
+      },
+    });
+
+    expect(applied.sheetName).toBe(taskDefinitionsByCode['29'].localSheetName);
+    expect(applied.rowIndex).toBe(2);
+    expect(applied.workbook[applied.sheetName][2][0]).toBe('средняя проба');
+    expect(applied.workbook[applied.sheetName][2][1]).toBe('300.2');
+    expect(applied.workbook[applied.sheetName][2][2]).toBe('Инфракрасный анализатор');
+    expect(applied.workbook[applied.sheetName][2][3]).toBe('19.4');
+    expect(applied.workbook[applied.sheetName][2][4]).toBe('out_of_tolerance');
+    expect(String(applied.workbook[applied.sheetName][2][5])).toContain('sample@mail.com');
+  });
+
   it('declares all disease steps as disease cards flow', () => {
     expect(taskDefinitionsByCode['1'].flowKind).toBe('disease_cards');
     expect(taskDefinitionsByCode['2'].flowKind).toBe('disease_cards');
@@ -573,15 +629,21 @@ describe('v2 core helpers', () => {
     expect(taskDefinitionsByCode['15'].flowKind).toBe('score_by_plot');
     expect(taskDefinitionsByCode['16'].flowKind).toBe('score_by_plot');
     expect(taskDefinitionsByCode['26'].flowKind).toBe('yield_by_plot');
+    expect(taskDefinitionsByCode['28'].flowKind).toBe('protein_content_step');
     expect(taskDefinitionsByCode['15'].logicalSheetKey).toBe('lodging_resistance_sheet');
     expect(taskDefinitionsByCode['16'].logicalSheetKey).toBe('shattering_resistance_sheet');
     expect(taskDefinitionsByCode['26'].logicalSheetKey).toBe('yield_per_area_sheet');
+    expect(taskDefinitionsByCode['28'].logicalSheetKey).toBe('protein_content_sheet');
     expect(taskDefinitionsByCode['10'].hasCarouselSamples).toBe(false);
     expect(taskDefinitionsByCode['15'].hasCarouselSamples).toBe(false);
     expect(taskDefinitionsByCode['26'].carouselAssetKey).toBe('yield_per_area');
     expect(taskDefinitionsByCode['27'].flowKind).toBe('thousand_seed_weight_step');
     expect(taskDefinitionsByCode['27'].logicalSheetKey).toBe('thousand_seed_weight_sheet');
     expect(taskDefinitionsByCode['27'].carouselAssetKey).toBe('thousand_seed_weight');
+    expect(taskDefinitionsByCode['28'].carouselAssetKey).toBe('protein_content');
+    expect(taskDefinitionsByCode['29'].flowKind).toBe('fat_content_step');
+    expect(taskDefinitionsByCode['29'].logicalSheetKey).toBe('fat_content_sheet');
+    expect(taskDefinitionsByCode['29'].carouselAssetKey).toBe('oil_content');
     expect(taskDefinitionsByCode['17'].flowKind).toBe('structure_by_sampling');
     expect(taskDefinitionsByCode['25'].flowKind).toBe('structure_by_sampling');
     expect(taskDefinitionsByCode['17'].logicalSheetKey).toBe('stem_length_sheet');

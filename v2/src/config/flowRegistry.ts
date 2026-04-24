@@ -1,8 +1,10 @@
 import {
   ChoiceSheetKey,
   DiseaseSheetKey,
+  FatContentSheetKey,
   LocalSheetKey,
   PhenologySheetKey,
+  ProteinContentSheetKey,
   ScoreSheetKey,
   StructureSheetKey,
   ThousandSeedWeightSheetKey,
@@ -444,6 +446,62 @@ function thousandSeedWeightTask(
   };
 }
 
+function proteinContentTask(
+  code: string,
+  title: string,
+  screenId: string,
+  sheetName: string,
+  logicalSheetKey: ProteinContentSheetKey,
+  intro: string,
+  criterionText: string,
+  explicitlySpecified: boolean,
+): TaskDefinition {
+  return {
+    code,
+    title,
+    screenId,
+    sheetName,
+    logicalSheetKey,
+    localSheetName: SHEET_ALIASES[logicalSheetKey].local,
+    futureRemoteSheetName: SHEET_ALIASES[logicalSheetKey].futureRemote,
+    kind: 'measurement',
+    flowKind: 'protein_content_step',
+    intro,
+    criterionText,
+    carouselAssetKey: 'protein_content',
+    hasCarouselSamples: false,
+    explicitlySpecified,
+  };
+}
+
+function fatContentTask(
+  code: string,
+  title: string,
+  screenId: string,
+  sheetName: string,
+  logicalSheetKey: FatContentSheetKey,
+  intro: string,
+  criterionText: string,
+  explicitlySpecified: boolean,
+): TaskDefinition {
+  return {
+    code,
+    title,
+    screenId,
+    sheetName,
+    logicalSheetKey,
+    localSheetName: SHEET_ALIASES[logicalSheetKey].local,
+    futureRemoteSheetName: SHEET_ALIASES[logicalSheetKey].futureRemote,
+    kind: 'measurement',
+    flowKind: 'fat_content_step',
+    intro,
+    criterionText,
+    carouselAssetKey: 'oil_content',
+    hasCarouselSamples: false,
+    explicitlySpecified,
+  };
+}
+
 function structureTask(
   code: string,
   title: string,
@@ -803,6 +861,8 @@ export const taskDefinitions: TaskDefinition[] = [
         '25',
         '26',
         '27',
+        '28',
+        '29',
       ].includes(item.code),
   ),
   choiceTask(
@@ -989,6 +1049,26 @@ export const taskDefinitions: TaskDefinition[] = [
     'thousand_seed_weight_sheet',
     'Введите массы двух проб по 500 семян. Если расхождение превышает допуск, добавьте третью пробу и выберите допустимую пару.',
     'Метод 2×500 семян по ГОСТ 12042-80 с возможной третьей пробой при недопустимом расхождении.',
+    true,
+  ),
+  proteinContentTask(
+    '28',
+    'РЎРѕРґРµСЂР¶Р°РЅРёРµ Р±РµР»РєР°',
+    'screen_f27a2c47',
+    '28.РЎРѕРґРµСЂР¶Р°РЅРёРµ Р±РµР»РєР°',
+    'protein_content_sheet',
+    'Р’РЅРµСЃРёС‚Рµ Р·РЅР°С‡РµРЅРёРµ СЃРѕРґРµСЂР¶Р°РЅРёСЏ Р±РµР»РєР° РїРѕ СЃСЂРµРґРЅРµР№ Р»Р°Р±РѕСЂР°С‚РѕСЂРЅРѕР№ РїСЂРѕР±Рµ.',
+    'РњРµС‚РѕРґ Р°РЅР°Р»РёР·Р°: РёРЅС„СЂР°РєСЂР°СЃРЅС‹Р№ Р°РЅР°Р»РёР·Р°С‚РѕСЂ. РќР°РІРµСЃРєР° 300 В± 0,1 Рі РїСЂРѕРІРµСЂСЏРµС‚СЃСЏ Рё СЃРѕС…СЂР°РЅСЏРµС‚СЃСЏ СЃРѕ СЃС‚Р°С‚СѓСЃРѕРј РґРѕРїСѓСЃРєР°.',
+    true,
+  ),
+  fatContentTask(
+    '29',
+    'РЎРѕРґРµСЂР¶Р°РЅРёРµ Р¶РёСЂР°',
+    'screen_c147d338',
+    '29.РЎРѕРґРµСЂР¶Р°РЅРёРµ Р¶РёСЂР°',
+    'fat_content_sheet',
+    'Р’РЅРµСЃРёС‚Рµ Р·РЅР°С‡РµРЅРёРµ СЃРѕРґРµСЂР¶Р°РЅРёСЏ Р¶РёСЂР° РїРѕ СЃСЂРµРґРЅРµР№ Р»Р°Р±РѕСЂР°С‚РѕСЂРЅРѕР№ РїСЂРѕР±Рµ.',
+    'РњРµС‚РѕРґ Р°РЅР°Р»РёР·Р°: РёРЅС„СЂР°РєСЂР°СЃРЅС‹Р№ Р°РЅР°Р»РёР·Р°С‚РѕСЂ. РќР°РІРµСЃРєР° 300 В± 0,1 Рі РїСЂРѕРІРµСЂСЏРµС‚СЃСЏ Рё СЃРѕС…СЂР°РЅСЏРµС‚СЃСЏ СЃРѕ СЃС‚Р°С‚СѓСЃРѕРј РґРѕРїСѓСЃРєР°.',
     true,
   ),
 ].map((item) =>

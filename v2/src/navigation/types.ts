@@ -9,6 +9,8 @@ export type V2RootStackParamList = {
   ScoreTask: { varietyId: string; taskCode: string };
   YieldTask: { varietyId: string; taskCode: string };
   ThousandSeedWeightTask: { varietyId: string; taskCode: string };
+  ProteinContentTask: { varietyId: string; taskCode: string };
+  FatContentTask: { varietyId: string; taskCode: string };
   PhenologyTask: { varietyId: string; taskCode: string };
   StructureSamplingTask: { varietyId: string; taskCode: string };
   ObservationTask: { varietyId: string; taskCode: string };

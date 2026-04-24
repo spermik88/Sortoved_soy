@@ -20,6 +20,8 @@ export type ScoreSheetKey =
   | 'shattering_resistance_sheet';
 export type YieldSheetKey = 'yield_per_area_sheet';
 export type ThousandSeedWeightSheetKey = 'thousand_seed_weight_sheet';
+export type ProteinContentSheetKey = 'protein_content_sheet';
+export type FatContentSheetKey = 'fat_content_sheet';
 export type StructureSheetKey =
   | 'stem_length_sheet'
   | 'lower_pod_attachment_sheet'
@@ -41,6 +43,8 @@ export type LocalSheetKey =
   | ScoreSheetKey
   | YieldSheetKey
   | ThousandSeedWeightSheetKey
+  | ProteinContentSheetKey
+  | FatContentSheetKey
   | StructureSheetKey
   | PhenologySheetKey;
 export type TaskFlowKind =
@@ -50,6 +54,8 @@ export type TaskFlowKind =
   | 'score_by_plot'
   | 'yield_by_plot'
   | 'thousand_seed_weight_step'
+  | 'protein_content_step'
+  | 'fat_content_step'
   | 'structure_by_sampling'
   | 'phenology_by_plot'
   | 'observation_single'
@@ -208,6 +214,24 @@ export interface ThousandSeedWeightDraft {
   isComplete: boolean;
 }
 
+export interface ProteinContentDraft {
+  sampleSource: 'средняя проба';
+  sampleMassGrams?: string;
+  analysisMethod: 'Инфракрасный анализатор';
+  proteinPercent?: string;
+  sampleToleranceStatus: 'valid' | 'out_of_tolerance';
+  isComplete: boolean;
+}
+
+export interface FatContentDraft {
+  sampleSource: 'средняя проба';
+  sampleMassGrams?: string;
+  analysisMethod: 'Инфракрасный анализатор';
+  fatPercent?: string;
+  sampleToleranceStatus: 'valid' | 'out_of_tolerance';
+  isComplete: boolean;
+}
+
 export interface StructurePlantCardDraft {
   id: string;
   samplingId: '1' | '2';
@@ -251,6 +275,8 @@ export interface InspectionTask {
   scorePlots?: Record<'1' | '2' | '3', ScorePlotDraft>;
   yieldPlots?: Record<'1' | '2' | '3', YieldPlotDraft>;
   thousandSeedWeight?: ThousandSeedWeightDraft;
+  proteinContent?: ProteinContentDraft;
+  fatContent?: FatContentDraft;
   samplings?: Record<'1' | '2', StructureSamplingDraft>;
   updatedAt: string;
 }

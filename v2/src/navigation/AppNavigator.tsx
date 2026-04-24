@@ -16,6 +16,8 @@ import {
   ObservationTaskScreen,
   PendingTaskScreen,
   PhenologyTaskScreen,
+  ProteinContentTaskScreen,
+  FatContentTaskScreen,
   ScoreTaskScreen,
   StructureSamplingTaskScreen,
   ThousandSeedWeightTaskScreen,
@@ -45,6 +47,8 @@ export function V2AppNavigator() {
         <Stack.Screen name="ScoreTask" component={ScoreTaskScreen} />
         <Stack.Screen name="YieldTask" component={YieldTaskScreen} />
         <Stack.Screen name="ThousandSeedWeightTask" component={ThousandSeedWeightTaskScreen} />
+        <Stack.Screen name="ProteinContentTask" component={ProteinContentTaskScreen} />
+        <Stack.Screen name="FatContentTask" component={FatContentTaskScreen} />
         <Stack.Screen name="PhenologyTask" component={PhenologyTaskScreen} />
         <Stack.Screen name="StructureSamplingTask" component={StructureSamplingTaskScreen} />
         <Stack.Screen name="ObservationTask" component={ObservationTaskScreen} />

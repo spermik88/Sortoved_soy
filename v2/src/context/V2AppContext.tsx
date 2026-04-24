@@ -18,6 +18,7 @@ import { isInternetReachable, subscribeToNetwork } from '../services/networkServ
 import { isValidGoogleSheetsUrl } from '../services/sheetsService';
 import {
   calculateYieldTonsPerHectare,
+  resolveProteinToleranceStatus,
   resolveThousandSeedWeightOutcome,
   templateService,
 } from '../services/templateService';
@@ -27,11 +28,15 @@ import {
   ChoicePlotDraft,
   ChoiceSheetKey,
   DiseaseSheetKey,
+  FatContentDraft,
+  FatContentSheetKey,
   InspectionCardDraft,
   InspectionTask,
   LocalSheetKey,
   PhenologyPlotDraft,
   PhenologySheetKey,
+  ProteinContentDraft,
+  ProteinContentSheetKey,
   PersistedV2State,
   QueuedOperation,
   ScorePlotDraft,
@@ -120,6 +125,8 @@ function isTaskQueueEntry(item: QueuedOperation, varietyId: string, taskCode: st
       payload.kind === 'score_step' ||
       payload.kind === 'yield_step' ||
       payload.kind === 'thousand_seed_weight_step' ||
+      payload.kind === 'protein_content_step' ||
+      payload.kind === 'fat_content_step' ||
       payload.kind === 'structure_sampling_step')
   );
 }
@@ -289,6 +296,52 @@ function getTaskUiStatus(
     return 'draft';
   }
 
+  if (task.flowKind === 'protein_content_step') {
+    const [taskQueue] = getTaskQueueEntries(queue, varietyId, task.code);
+
+    if (taskQueue?.status === 'synced') {
+      return 'processed';
+    }
+
+    if (taskQueue && ['queued', 'processing', 'failed'].includes(taskQueue.status)) {
+      return 'queued';
+    }
+
+    if (task.completedAt) {
+      return 'ready_local';
+    }
+
+    const draft = task.proteinContent;
+    if (!draft?.sampleMassGrams && !draft?.proteinPercent) {
+      return 'not_started';
+    }
+
+    return 'draft';
+  }
+
+  if (task.flowKind === 'fat_content_step') {
+    const [taskQueue] = getTaskQueueEntries(queue, varietyId, task.code);
+
+    if (taskQueue?.status === 'synced') {
+      return 'processed';
+    }
+
+    if (taskQueue && ['queued', 'processing', 'failed'].includes(taskQueue.status)) {
+      return 'queued';
+    }
+
+    if (task.completedAt) {
+      return 'ready_local';
+    }
+
+    const draft = task.fatContent;
+    if (!draft?.sampleMassGrams && !draft?.fatPercent) {
+      return 'not_started';
+    }
+
+    return 'draft';
+  }
+
   if (task.flowKind === 'structure_by_sampling') {
     const [taskQueue] = getTaskQueueEntries(queue, varietyId, task.code);
 
@@ -392,6 +445,24 @@ function createEmptyThousandSeedWeightDraft(): ThousandSeedWeightDraft {
   };
 }
 
+function createEmptyProteinContentDraft(): ProteinContentDraft {
+  return {
+    sampleSource: 'средняя проба',
+    analysisMethod: 'Инфракрасный анализатор',
+    sampleToleranceStatus: 'out_of_tolerance',
+    isComplete: false,
+  };
+}
+
+function createEmptyFatContentDraft(): FatContentDraft {
+  return {
+    sampleSource: 'средняя проба',
+    analysisMethod: 'Инфракрасный анализатор',
+    sampleToleranceStatus: 'out_of_tolerance',
+    isComplete: false,
+  };
+}
+
 function createEmptySamplings(): Record<'1' | '2', StructureSamplingDraft> {
   return {
     '1': { samplingId: '1', cards: [], isComplete: false },
@@ -462,6 +533,40 @@ function isThousandSeedWeightCompletable(draft: ThousandSeedWeightDraft | undefi
   );
 }
 
+function isProteinContentCompletable(draft: ProteinContentDraft | undefined) {
+  if (!draft) {
+    return false;
+  }
+
+  const mass = Number(draft.sampleMassGrams);
+  const protein = Number(draft.proteinPercent);
+  return Boolean(
+    draft.sampleMassGrams?.trim() &&
+      draft.proteinPercent?.trim() &&
+      Number.isFinite(mass) &&
+      Number.isFinite(protein) &&
+      mass > 0 &&
+      protein >= 0,
+  );
+}
+
+function isFatContentCompletable(draft: FatContentDraft | undefined) {
+  if (!draft) {
+    return false;
+  }
+
+  const mass = Number(draft.sampleMassGrams);
+  const fat = Number(draft.fatPercent);
+  return Boolean(
+    draft.sampleMassGrams?.trim() &&
+      draft.fatPercent?.trim() &&
+      Number.isFinite(mass) &&
+      Number.isFinite(fat) &&
+      mass > 0 &&
+      fat >= 0,
+  );
+}
+
 function isStructureCardComplete(card: StructurePlantCardDraft) {
   return Boolean(
     card.photoUri &&
@@ -511,6 +616,10 @@ function finalizeTask(
             Object.values(task.yieldPlots || {}).every(isYieldPlotComplete)
         : task.flowKind === 'thousand_seed_weight_step'
           ? isThousandSeedWeightCompletable(task.thousandSeedWeight)
+        : task.flowKind === 'protein_content_step'
+          ? isProteinContentCompletable(task.proteinContent)
+        : task.flowKind === 'fat_content_step'
+          ? isFatContentCompletable(task.fatContent)
         : task.flowKind === 'structure_by_sampling'
           ? Boolean(task.samplings) &&
             Object.values(task.samplings || {}).every(isSamplingComplete)
@@ -559,6 +668,9 @@ function createTaskFromDefinition(
       taskDef.flowKind === 'thousand_seed_weight_step'
         ? createEmptyThousandSeedWeightDraft()
         : undefined,
+    proteinContent:
+      taskDef.flowKind === 'protein_content_step' ? createEmptyProteinContentDraft() : undefined,
+    fatContent: taskDef.flowKind === 'fat_content_step' ? createEmptyFatContentDraft() : undefined,
     samplings: taskDef.flowKind === 'structure_by_sampling' ? createEmptySamplings() : undefined,
     updatedAt: new Date().toISOString(),
   };
@@ -651,6 +763,16 @@ interface V2ContextValue {
     varietyId: string,
     taskCode: string,
     changes: Partial<ThousandSeedWeightDraft>,
+  ): void;
+  updateProteinContent(
+    varietyId: string,
+    taskCode: string,
+    changes: Partial<ProteinContentDraft>,
+  ): void;
+  updateFatContent(
+    varietyId: string,
+    taskCode: string,
+    changes: Partial<FatContentDraft>,
   ): void;
   selectThousandSeedWeightPair(
     varietyId: string,
@@ -1235,6 +1357,172 @@ export function V2AppProvider({ children }: { children: ReactNode }) {
     });
   }
 
+  async function processProteinContentStepOperation(item: QueuedOperation) {
+    const payload = item.payload as Record<string, unknown>;
+    const varietyId = item.varietyId;
+    const taskCode = String(payload.taskCode || item.screenId || '');
+    const logicalSheetKey = payload.logicalSheetKey as ProteinContentSheetKey | undefined;
+    const draft = payload.draft as ProteinContentDraft | undefined;
+
+    if (!varietyId || !taskCode || !logicalSheetKey || !draft) {
+      throw new Error(v2Copy.localSyncError);
+    }
+
+    setState((current) => {
+      const variety = current.catalog.find((entry) => entry.id === varietyId);
+      if (!variety) {
+        throw new Error(v2Copy.varietyNotFound);
+      }
+
+      const workbook =
+        variety.setup?.localWorkbook || templateService.createLocalWorkbookCopy();
+      const nextWorkbook = JSON.parse(JSON.stringify(workbook)) as Record<
+        string,
+        (string | number | boolean)[][]
+      >;
+      const task =
+        current.inspections[varietyId]?.[taskCode] ||
+        createTaskFromDefinition(varietyId, taskCode, current.syncQueue);
+      const applied = templateService.applyProteinContentStepWrite(nextWorkbook, logicalSheetKey, {
+        draft,
+        userEmail: current.session?.email,
+        completedAt: task.completedAt,
+      });
+
+      const nextQueue: QueuedOperation[] = current.syncQueue.map((entry) =>
+        entry.id === item.id
+          ? ({
+              ...entry,
+              status: 'synced',
+              updatedAt: new Date().toISOString(),
+              lastError: undefined,
+            } satisfies QueuedOperation)
+          : entry,
+      );
+
+      const nextTask: InspectionTask = {
+        ...task,
+        proteinContent: draft,
+        cardsCompleted: true,
+        completedAt: task.completedAt || new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        uiStatus: 'processed',
+      };
+
+      return {
+        ...current,
+        syncQueue: nextQueue,
+        catalog: current.catalog.map((entry) =>
+          entry.id === varietyId
+            ? {
+                ...entry,
+                status: 'ready',
+                updatedAt: new Date().toISOString(),
+                lastError: undefined,
+                setup: {
+                  ...entry.setup,
+                  localWorkbook: applied.workbook,
+                },
+              }
+            : entry,
+        ),
+        inspections: {
+          ...current.inspections,
+          [varietyId]: {
+            ...current.inspections[varietyId],
+            [taskCode]: {
+              ...nextTask,
+              uiStatus: getTaskUiStatus(varietyId, nextTask, nextQueue),
+            },
+          },
+        },
+      };
+    });
+  }
+
+  async function processFatContentStepOperation(item: QueuedOperation) {
+    const payload = item.payload as Record<string, unknown>;
+    const varietyId = item.varietyId;
+    const taskCode = String(payload.taskCode || item.screenId || '');
+    const logicalSheetKey = payload.logicalSheetKey as FatContentSheetKey | undefined;
+    const draft = payload.draft as FatContentDraft | undefined;
+
+    if (!varietyId || !taskCode || !logicalSheetKey || !draft) {
+      throw new Error(v2Copy.localSyncError);
+    }
+
+    setState((current) => {
+      const variety = current.catalog.find((entry) => entry.id === varietyId);
+      if (!variety) {
+        throw new Error(v2Copy.varietyNotFound);
+      }
+
+      const workbook =
+        variety.setup?.localWorkbook || templateService.createLocalWorkbookCopy();
+      const nextWorkbook = JSON.parse(JSON.stringify(workbook)) as Record<
+        string,
+        (string | number | boolean)[][]
+      >;
+      const task =
+        current.inspections[varietyId]?.[taskCode] ||
+        createTaskFromDefinition(varietyId, taskCode, current.syncQueue);
+      const applied = templateService.applyFatContentStepWrite(nextWorkbook, logicalSheetKey, {
+        draft,
+        userEmail: current.session?.email,
+        completedAt: task.completedAt,
+      });
+
+      const nextQueue: QueuedOperation[] = current.syncQueue.map((entry) =>
+        entry.id === item.id
+          ? ({
+              ...entry,
+              status: 'synced',
+              updatedAt: new Date().toISOString(),
+              lastError: undefined,
+            } satisfies QueuedOperation)
+          : entry,
+      );
+
+      const nextTask: InspectionTask = {
+        ...task,
+        fatContent: draft,
+        cardsCompleted: true,
+        completedAt: task.completedAt || new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        uiStatus: 'processed',
+      };
+
+      return {
+        ...current,
+        syncQueue: nextQueue,
+        catalog: current.catalog.map((entry) =>
+          entry.id === varietyId
+            ? {
+                ...entry,
+                status: 'ready',
+                updatedAt: new Date().toISOString(),
+                lastError: undefined,
+                setup: {
+                  ...entry.setup,
+                  localWorkbook: applied.workbook,
+                },
+              }
+            : entry,
+        ),
+        inspections: {
+          ...current.inspections,
+          [varietyId]: {
+            ...current.inspections[varietyId],
+            [taskCode]: {
+              ...nextTask,
+              uiStatus: getTaskUiStatus(varietyId, nextTask, nextQueue),
+            },
+          },
+        },
+      };
+    });
+  }
+
   async function processStructureSamplingStepOperation(item: QueuedOperation) {
     const payload = item.payload as Record<string, unknown>;
     const varietyId = item.varietyId;
@@ -1386,9 +1674,25 @@ export function V2AppProvider({ children }: { children: ReactNode }) {
           continue;
         }
 
-        if (
-          item.type === 'write_sheet' &&
-          (item.payload as Record<string, unknown>).kind === 'structure_sampling_step'
+          if (
+            item.type === 'write_sheet' &&
+            (item.payload as Record<string, unknown>).kind === 'protein_content_step'
+          ) {
+            await processProteinContentStepOperation(item);
+            continue;
+          }
+
+          if (
+            item.type === 'write_sheet' &&
+            (item.payload as Record<string, unknown>).kind === 'fat_content_step'
+          ) {
+            await processFatContentStepOperation(item);
+            continue;
+          }
+
+          if (
+            item.type === 'write_sheet' &&
+            (item.payload as Record<string, unknown>).kind === 'structure_sampling_step'
         ) {
           await processStructureSamplingStepOperation(item);
           continue;
@@ -1970,6 +2274,66 @@ export function V2AppProvider({ children }: { children: ReactNode }) {
           },
         });
       },
+      updateProteinContent(varietyId, taskCode, changes) {
+        const currentTask = getTaskInternal(varietyId, taskCode);
+        if (currentTask.flowKind !== 'protein_content_step' || currentTask.completedAt) {
+          return;
+        }
+
+        const nextDraft = {
+          ...(currentTask.proteinContent || createEmptyProteinContentDraft()),
+          ...changes,
+        } as ProteinContentDraft;
+        const mass = Number(nextDraft.sampleMassGrams);
+        const protein = Number(nextDraft.proteinPercent);
+
+        nextDraft.sampleSource = 'средняя проба';
+        nextDraft.analysisMethod = 'Инфракрасный анализатор';
+        nextDraft.sampleToleranceStatus = resolveProteinToleranceStatus(nextDraft.sampleMassGrams);
+        nextDraft.isComplete = Boolean(
+          nextDraft.sampleMassGrams?.trim() &&
+            nextDraft.proteinPercent?.trim() &&
+            Number.isFinite(mass) &&
+            Number.isFinite(protein) &&
+            mass > 0 &&
+            protein >= 0,
+        );
+
+        saveDraftTask(varietyId, taskCode, {
+          ...currentTask,
+          proteinContent: nextDraft,
+        });
+      },
+      updateFatContent(varietyId, taskCode, changes) {
+        const currentTask = getTaskInternal(varietyId, taskCode);
+        if (currentTask.flowKind !== 'fat_content_step' || currentTask.completedAt) {
+          return;
+        }
+
+        const nextDraft = {
+          ...(currentTask.fatContent || createEmptyFatContentDraft()),
+          ...changes,
+        } as FatContentDraft;
+        const mass = Number(nextDraft.sampleMassGrams);
+        const fat = Number(nextDraft.fatPercent);
+
+        nextDraft.sampleSource = 'средняя проба';
+        nextDraft.analysisMethod = 'Инфракрасный анализатор';
+        nextDraft.sampleToleranceStatus = resolveProteinToleranceStatus(nextDraft.sampleMassGrams);
+        nextDraft.isComplete = Boolean(
+          nextDraft.sampleMassGrams?.trim() &&
+            nextDraft.fatPercent?.trim() &&
+            Number.isFinite(mass) &&
+            Number.isFinite(fat) &&
+            mass > 0 &&
+            fat >= 0,
+        );
+
+        saveDraftTask(varietyId, taskCode, {
+          ...currentTask,
+          fatContent: nextDraft,
+        });
+      },
       updateSamplingPlot(varietyId, taskCode, samplingId, plot) {
         const currentTask = getTaskInternal(varietyId, taskCode);
         if (currentTask.flowKind !== 'structure_by_sampling' || currentTask.completedAt) {
@@ -2259,6 +2623,14 @@ export function V2AppProvider({ children }: { children: ReactNode }) {
           if (!isThousandSeedWeightCompletable(currentTask.thousandSeedWeight)) {
             throw new Error(v2Copy.taskMeasurementRequired);
           }
+        } else if (currentTask.flowKind === 'protein_content_step') {
+          if (!isProteinContentCompletable(currentTask.proteinContent)) {
+            throw new Error(v2Copy.taskMeasurementRequired);
+          }
+        } else if (currentTask.flowKind === 'fat_content_step') {
+          if (!isFatContentCompletable(currentTask.fatContent)) {
+            throw new Error(v2Copy.taskMeasurementRequired);
+          }
         } else if (currentTask.flowKind === 'structure_by_sampling') {
           if (
             !currentTask.samplings ||
@@ -2301,13 +2673,15 @@ export function V2AppProvider({ children }: { children: ReactNode }) {
             task.flowKind === 'phenology_by_plot' ||
             task.flowKind === 'choice_by_plot' ||
             task.flowKind === 'score_by_plot' ||
-            task.flowKind === 'yield_by_plot' ||
-            task.flowKind === 'thousand_seed_weight_step' ||
-            task.flowKind === 'structure_by_sampling'
-          ) &&
-          !taskDef?.logicalSheetKey
-        ) {
-          throw new Error(v2Copy.localSyncError);
+              task.flowKind === 'yield_by_plot' ||
+              task.flowKind === 'thousand_seed_weight_step' ||
+              task.flowKind === 'protein_content_step' ||
+              task.flowKind === 'fat_content_step' ||
+              task.flowKind === 'structure_by_sampling'
+            ) &&
+            !taskDef?.logicalSheetKey
+          ) {
+            throw new Error(v2Copy.localSyncError);
         }
         const operation: QueuedOperation =
           task.flowKind === 'phenology_by_plot'
@@ -2420,8 +2794,46 @@ export function V2AppProvider({ children }: { children: ReactNode }) {
                     },
                     media: [],
                   }
-              : task.flowKind === 'structure_by_sampling'
-                ? {
+                : task.flowKind === 'protein_content_step'
+                  ? {
+                      id: createId('queue'),
+                      type: 'write_sheet',
+                    varietyId,
+                    screenId: taskCode,
+                    status: 'queued',
+                    idempotencyKey: `${variety.binding.spreadsheetId}:${taskCode}:${task.updatedAt}`,
+                    createdAt: new Date().toISOString(),
+                    updatedAt: new Date().toISOString(),
+                    retryCount: 0,
+                    payload: {
+                      kind: 'protein_content_step',
+                      taskCode,
+                      logicalSheetKey: taskDef.logicalSheetKey,
+                      draft: task.proteinContent,
+                      },
+                      media: [],
+                    }
+                : task.flowKind === 'fat_content_step'
+                  ? {
+                      id: createId('queue'),
+                      type: 'write_sheet',
+                      varietyId,
+                      screenId: taskCode,
+                      status: 'queued',
+                      idempotencyKey: `${variety.binding.spreadsheetId}:${taskCode}:${task.updatedAt}`,
+                      createdAt: new Date().toISOString(),
+                      updatedAt: new Date().toISOString(),
+                      retryCount: 0,
+                      payload: {
+                        kind: 'fat_content_step',
+                        taskCode,
+                        logicalSheetKey: taskDef.logicalSheetKey,
+                        draft: task.fatContent,
+                      },
+                      media: [],
+                    }
+                : task.flowKind === 'structure_by_sampling'
+                  ? {
                     id: createId('queue'),
                     type: 'write_sheet',
                     varietyId,

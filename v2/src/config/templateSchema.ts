@@ -94,6 +94,15 @@ const THOUSAND_SEED_WEIGHT_HEADER_ROW = [
   'мета',
 ] as const;
 
+const PROTEIN_CONTENT_HEADER_ROW = [
+  'РёСЃС‚РѕС‡РЅРёРє РїСЂРѕР±С‹',
+  'РјР°СЃСЃР° РЅР°РІРµСЃРєРё, Рі',
+  'РјРµС‚РѕРґ Р°РЅР°Р»РёР·Р°',
+  'СЃРѕРґРµСЂР¶Р°РЅРёРµ Р±РµР»РєР°, %',
+  'СЃС‚Р°С‚СѓСЃ РЅР°РІРµСЃРєРё',
+  'РјРµС‚Р°',
+] as const;
+
 function createDiseaseSheetTemplate() {
   return [
     [1, '', '', '', '', 2, '', '', '', '', 3, '', '', '', ''],
@@ -131,6 +140,13 @@ function createYieldSheetTemplate(title: string) {
 
 function createThousandSeedWeightSheetTemplate(title: string) {
   return [[title, '', '', '', '', '', '', '', '', '', ''], [...THOUSAND_SEED_WEIGHT_HEADER_ROW]] as (
+    | string
+    | number
+  )[][];
+}
+
+function createProteinContentSheetTemplate(title: string) {
+  return [[title, '', '', '', '', ''], [...PROTEIN_CONTENT_HEADER_ROW]] as (
     | string
     | number
   )[][];
@@ -230,6 +246,14 @@ export const SHEET_ALIASES: Record<
   thousand_seed_weight_sheet: {
     local: '27.Масса 1000 семян',
     futureRemote: '27.Масса 1000 семян',
+  },
+  protein_content_sheet: {
+    local: '28.РЎРѕРґРµСЂР¶Р°РЅРёРµ Р±РµР»РєР°',
+    futureRemote: '28.РЎРѕРґРµСЂР¶Р°РЅРёРµ Р±РµР»РєР°',
+  },
+  fat_content_sheet: {
+    local: '29.РЎРѕРґРµСЂР¶Р°РЅРёРµ Р¶РёСЂР°',
+    futureRemote: '29.РЎРѕРґРµСЂР¶Р°РЅРёРµ Р¶РёСЂР°',
   },
   stem_length_sheet: {
     local: '17.Длина стебля',

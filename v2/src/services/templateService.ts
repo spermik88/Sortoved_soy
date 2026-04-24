@@ -9,9 +9,13 @@ import {
   ChoiceSheetKey,
   CandidatePairResult,
   DiseaseSheetKey,
+  FatContentDraft,
+  FatContentSheetKey,
   InspectionTask,
   PhenologyPlotDraft,
   PhenologySheetKey,
+  ProteinContentDraft,
+  ProteinContentSheetKey,
   ScorePlotDraft,
   ScoreSheetKey,
   SeedWeightPair,
@@ -165,6 +169,15 @@ export function calculateAllowedDifference(sumWeight: number) {
 
 export function roundThousandSeedWeightByGost(value: number) {
   return roundHalfToEven(value, value > 10 ? 1 : 2);
+}
+
+export function resolveProteinToleranceStatus(sampleMassGrams?: string) {
+  const mass = Number(sampleMassGrams);
+  if (!sampleMassGrams?.trim() || !Number.isFinite(mass) || mass <= 0) {
+    return 'out_of_tolerance' as const;
+  }
+
+  return mass >= 299.9 && mass <= 300.1 ? ('valid' as const) : ('out_of_tolerance' as const);
 }
 
 function formatDecimal(value: number, fractionDigits: number) {
@@ -353,6 +366,18 @@ function buildTemplateWorkbook() {
   Object.entries(TEMPLATE_SHEETS).forEach(([name, rows]) => {
     workbook[name] = cloneSheet(rows);
   });
+  if (!workbook[SHEET_ALIASES.protein_content_sheet.local]) {
+    workbook[SHEET_ALIASES.protein_content_sheet.local] = [
+      ['28. РЎРѕРґРµСЂР¶Р°РЅРёРµ Р±РµР»РєР°', '', '', '', '', ''],
+      ['РёСЃС‚РѕС‡РЅРёРє РїСЂРѕР±С‹', 'РјР°СЃСЃР° РЅР°РІРµСЃРєРё, Рі', 'РјРµС‚РѕРґ Р°РЅР°Р»РёР·Р°', 'СЃРѕРґРµСЂР¶Р°РЅРёРµ Р±РµР»РєР°, %', 'СЃС‚Р°С‚СѓСЃ РЅР°РІРµСЃРєРё', 'РјРµС‚Р°'],
+    ];
+  }
+  if (!workbook[SHEET_ALIASES.fat_content_sheet.local]) {
+    workbook[SHEET_ALIASES.fat_content_sheet.local] = [
+      ['29. РЎРѕРґРµСЂР¶Р°РЅРёРµ Р¶РёСЂР°', '', '', '', '', ''],
+      ['РёСЃС‚РѕС‡РЅРёРє РїСЂРѕР±С‹', 'РјР°СЃСЃР° РЅР°РІРµСЃРєРё, Рі', 'РјРµС‚РѕРґ Р°РЅР°Р»РёР·Р°', 'СЃРѕРґРµСЂР¶Р°РЅРёРµ Р¶РёСЂР°, %', 'СЃС‚Р°С‚СѓСЃ РЅР°РІРµСЃРєРё', 'РјРµС‚Р°'],
+    ];
+  }
   EMPTY_TRAIT_SHEETS.forEach((name) => {
     if (!workbook[name]) {
       workbook[name] = cloneSheet(GENERIC_TRAIT_HEADERS);
@@ -462,6 +487,30 @@ export interface ThousandSeedWeightStepWriteResult {
   rowIndex: number;
 }
 
+export interface ProteinContentStepWriteInput {
+  draft: ProteinContentDraft;
+  userEmail?: string;
+  completedAt?: string;
+}
+
+export interface ProteinContentStepWriteResult {
+  workbook: Workbook;
+  sheetName: string;
+  rowIndex: number;
+}
+
+export interface FatContentStepWriteInput {
+  draft: FatContentDraft;
+  userEmail?: string;
+  completedAt?: string;
+}
+
+export interface FatContentStepWriteResult {
+  workbook: Workbook;
+  sheetName: string;
+  rowIndex: number;
+}
+
 export interface TemplateService {
   createVarietyWorkbook(draft: VarietyCreationDraft): Workbook;
   buildCreationWrites(draft: VarietyCreationDraft): SheetWriteOperation[];
@@ -502,6 +551,16 @@ export interface TemplateService {
     logicalSheetKey: ThousandSeedWeightSheetKey,
     input: ThousandSeedWeightStepWriteInput,
   ): ThousandSeedWeightStepWriteResult;
+  applyProteinContentStepWrite(
+    workbook: Workbook,
+    logicalSheetKey: ProteinContentSheetKey,
+    input: ProteinContentStepWriteInput,
+  ): ProteinContentStepWriteResult;
+  applyFatContentStepWrite(
+    workbook: Workbook,
+    logicalSheetKey: FatContentSheetKey,
+    input: FatContentStepWriteInput,
+  ): FatContentStepWriteResult;
   appendStructureSamplingStepWrite(
     workbook: Workbook,
     logicalSheetKey: StructureSheetKey,
@@ -734,6 +793,72 @@ class WorkbookTemplateService implements TemplateService {
     sheet[DATA_START_ROW_INDEX][10] = formatLabMeta(input.userEmail, input.completedAt);
 
     workbook[sheetName] = sheet;
+    return {
+      workbook,
+      sheetName,
+      rowIndex: DATA_START_ROW_INDEX,
+    };
+  }
+
+  applyProteinContentStepWrite(
+    workbook: Workbook,
+    logicalSheetKey: ProteinContentSheetKey,
+    input: ProteinContentStepWriteInput,
+  ): ProteinContentStepWriteResult {
+    const sheetName = SHEET_ALIASES[logicalSheetKey].local;
+    const sheet = workbook[sheetName]
+      ? sheetClone(workbook[sheetName])
+      : [
+          ['28. РЎРѕРґРµСЂР¶Р°РЅРёРµ Р±РµР»РєР°', '', '', '', '', ''],
+          ['РёСЃС‚РѕС‡РЅРёРє РїСЂРѕР±С‹', 'РјР°СЃСЃР° РЅР°РІРµСЃРєРё, Рі', 'РјРµС‚РѕРґ Р°РЅР°Р»РёР·Р°', 'СЃРѕРґРµСЂР¶Р°РЅРёРµ Р±РµР»РєР°, %', 'СЃС‚Р°С‚СѓСЃ РЅР°РІРµСЃРєРё', 'РјРµС‚Р°'],
+        ];
+
+    ensureCell(sheet, DATA_START_ROW_INDEX, 5);
+    sheet[DATA_START_ROW_INDEX][0] = input.draft.sampleSource;
+    sheet[DATA_START_ROW_INDEX][1] = input.draft.sampleMassGrams || '';
+    sheet[DATA_START_ROW_INDEX][2] = input.draft.analysisMethod;
+    sheet[DATA_START_ROW_INDEX][3] = input.draft.proteinPercent || '';
+    sheet[DATA_START_ROW_INDEX][4] = input.draft.sampleToleranceStatus;
+    sheet[DATA_START_ROW_INDEX][5] = formatLabMeta(input.userEmail, input.completedAt);
+
+    workbook[sheetName] = sheet;
+    return {
+      workbook,
+      sheetName,
+      rowIndex: DATA_START_ROW_INDEX,
+    };
+  }
+
+  applyFatContentStepWrite(
+    workbook: Workbook,
+    logicalSheetKey: FatContentSheetKey,
+    input: FatContentStepWriteInput,
+  ): FatContentStepWriteResult {
+    const sheetName = SHEET_ALIASES[logicalSheetKey].local;
+    const sheet = workbook[sheetName]
+      ? sheetClone(workbook[sheetName])
+      : [
+          ['29. РЎРѕРґРµСЂР¶Р°РЅРёРµ Р¶РёСЂР°', '', '', '', '', ''],
+          [
+            'РёСЃС‚РѕС‡РЅРёРє РїСЂРѕР±С‹',
+            'РјР°СЃСЃР° РЅР°РІРµСЃРєРё, Рі',
+            'РјРµС‚РѕРґ Р°РЅР°Р»РёР·Р°',
+            'СЃРѕРґРµСЂР¶Р°РЅРёРµ Р¶РёСЂР°, %',
+            'СЃС‚Р°С‚СѓСЃ РЅР°РІРµСЃРєРё',
+            'РјРµС‚Р°',
+          ],
+        ];
+
+    ensureCell(sheet, DATA_START_ROW_INDEX, 5);
+    sheet[DATA_START_ROW_INDEX][0] = input.draft.sampleSource;
+    sheet[DATA_START_ROW_INDEX][1] = input.draft.sampleMassGrams || '';
+    sheet[DATA_START_ROW_INDEX][2] = input.draft.analysisMethod;
+    sheet[DATA_START_ROW_INDEX][3] = input.draft.fatPercent || '';
+    sheet[DATA_START_ROW_INDEX][4] = input.draft.sampleToleranceStatus;
+    sheet[DATA_START_ROW_INDEX][5] = formatLabMeta(input.userEmail, input.completedAt);
+
+    workbook[sheetName] = sheet;
+
     return {
       workbook,
       sheetName,

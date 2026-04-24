@@ -86,6 +86,16 @@ export function VarietyScreen({
       return;
     }
 
+    if (taskDef.flowKind === 'protein_content_step') {
+      navigation.navigate('ProteinContentTask', { varietyId: variety.id, taskCode });
+      return;
+    }
+
+    if (taskDef.flowKind === 'fat_content_step') {
+      navigation.navigate('FatContentTask', { varietyId: variety.id, taskCode });
+      return;
+    }
+
     if (taskDef.flowKind === 'phenology_by_plot') {
       navigation.navigate('PhenologyTask', { varietyId: variety.id, taskCode });
       return;

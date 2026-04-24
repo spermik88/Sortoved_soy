@@ -102,4 +102,16 @@ export const carouselRegistry: Record<string, CarouselRegistryEntry> = {
     available: false,
     imageSources: [],
   },
+  '28': {
+    taskCode: '28',
+    assetGroupKey: 'protein_content',
+    available: false,
+    imageSources: [],
+  },
+  '29': {
+    taskCode: '29',
+    assetGroupKey: 'oil_content',
+    available: false,
+    imageSources: [],
+  },
 };

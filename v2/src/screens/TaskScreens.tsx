@@ -20,6 +20,7 @@ import { locationService } from '../services/locationService';
 import { mediaCaptureService } from '../services/mediaCaptureService';
 import {
   ChoicePlotDraft,
+  FatContentDraft,
   InspectionCardDraft,
   PhenologyPlotDraft,
   ScorePlotDraft,
@@ -27,6 +28,7 @@ import {
   StructurePlantCardDraft,
   StructureSamplingDraft,
   ThousandSeedWeightDraft,
+  ProteinContentDraft,
   YieldPlotDraft,
 } from '../types/app';
 
@@ -62,9 +64,11 @@ function returnToVariety(
     | NativeStackScreenProps<V2RootStackParamList, 'FusariumCards'>['navigation']
     | NativeStackScreenProps<V2RootStackParamList, 'ChoiceTask'>['navigation']
     | NativeStackScreenProps<V2RootStackParamList, 'ScoreTask'>['navigation']
-    | NativeStackScreenProps<V2RootStackParamList, 'YieldTask'>['navigation']
-    | NativeStackScreenProps<V2RootStackParamList, 'ThousandSeedWeightTask'>['navigation']
-    | NativeStackScreenProps<V2RootStackParamList, 'PhenologyTask'>['navigation']
+  | NativeStackScreenProps<V2RootStackParamList, 'YieldTask'>['navigation']
+  | NativeStackScreenProps<V2RootStackParamList, 'ThousandSeedWeightTask'>['navigation']
+  | NativeStackScreenProps<V2RootStackParamList, 'ProteinContentTask'>['navigation']
+  | NativeStackScreenProps<V2RootStackParamList, 'FatContentTask'>['navigation']
+  | NativeStackScreenProps<V2RootStackParamList, 'PhenologyTask'>['navigation']
     | NativeStackScreenProps<V2RootStackParamList, 'StructureSamplingTask'>['navigation']
     | NativeStackScreenProps<V2RootStackParamList, 'MeasurementTask'>['navigation']
     | NativeStackScreenProps<V2RootStackParamList, 'ObservationTask'>['navigation']
@@ -142,6 +146,26 @@ function getThousandSeedWeightStatusLabel(draft: ThousandSeedWeightDraft) {
     return 'Черновик';
   }
   return 'Не начато';
+}
+
+function getProteinContentStatusLabel(draft: ProteinContentDraft) {
+  if (draft.isComplete) {
+    return 'Р“РѕС‚РѕРІРѕ';
+  }
+  if (draft.sampleMassGrams || draft.proteinPercent) {
+    return 'Р§РµСЂРЅРѕРІРёРє';
+  }
+  return 'РќРµ РЅР°С‡Р°С‚Рѕ';
+}
+
+function getFatContentStatusLabel(draft: FatContentDraft) {
+  if (draft.isComplete) {
+    return 'Р вЂњР С•РЎвЂљР С•Р Р†Р С•';
+  }
+  if (draft.sampleMassGrams || draft.fatPercent) {
+    return 'Р В§Р ВµРЎР‚Р Р…Р С•Р Р†Р С‘Р С”';
+  }
+  return 'Р СњР Вµ Р Р…Р В°РЎвЂЎР В°РЎвЂљР С•';
 }
 
 function getSamplingStatusLabel(sampling: StructureSamplingDraft) {
@@ -941,6 +965,192 @@ export function ThousandSeedWeightTaskScreen({
             }
             onPress={() => void saveStep()}
           />
+        ) : (
+          <Button
+            label={v2Copy.returnToVariety}
+            variant="secondary"
+            onPress={() => returnToVariety(navigation, variety.id)}
+          />
+        )}
+        <Button label={v2Copy.back} variant="ghost" onPress={() => navigation.goBack()} />
+      </Card>
+    </Screen>
+  );
+}
+
+export function ProteinContentTaskScreen({
+  route,
+  navigation,
+}: NativeStackScreenProps<V2RootStackParamList, 'ProteinContentTask'>) {
+  const {
+    variety,
+    task,
+    taskDef,
+    updateProteinContent,
+    completeTaskLocally,
+    queueTaskSubmission,
+  } = useTaskData(route.params.varietyId, route.params.taskCode);
+
+  if (!variety || !taskDef || !task.proteinContent) {
+    return null;
+  }
+
+  const locked = Boolean(task.completedAt);
+  const draft = task.proteinContent;
+
+  const saveStep = async () => {
+    try {
+      completeTaskLocally(variety.id, task.code);
+      await queueTaskSubmission(variety.id, task.code);
+      Alert.alert(v2Copy.doneTitle, v2Copy.taskQueuedDone);
+      returnToVariety(navigation, variety.id);
+    } catch (error) {
+      Alert.alert(
+        v2Copy.errorTitle,
+        error instanceof Error ? error.message : v2Copy.completeStepFailed,
+      );
+    }
+  };
+
+  return (
+    <Screen>
+      <TaskHeader title={task.title} subtitle={variety.title} intro={task.intro || ''} />
+      <TaskSamples taskCode={task.code} />
+      <Card>
+        <Text style={uiStyles.paragraph}>{taskDef.criterionText || ''}</Text>
+        <Text style={uiStyles.paragraph}>{`РЎС‚Р°С‚СѓСЃ С€Р°РіР°: ${getProteinContentStatusLabel(draft)}`}</Text>
+        <Text style={uiStyles.paragraph}>
+          {`РЎС‚Р°С‚СѓСЃ РЅР°РІРµСЃРєРё: ${
+            draft.sampleToleranceStatus === 'valid' ? 'РІ РґРѕРїСѓСЃРєРµ' : 'РІРЅРµ РґРѕРїСѓСЃРєР°'
+          }`}
+        </Text>
+      </Card>
+      <Card>
+        <Field
+          label="РСЃС‚РѕС‡РЅРёРє РїСЂРѕР±С‹"
+          value={draft.sampleSource}
+          editable={false}
+          onChangeText={() => {}}
+        />
+        <Field
+          label="РњР°СЃСЃР° РЅР°РІРµСЃРєРё, Рі"
+          value={draft.sampleMassGrams || ''}
+          editable={!locked}
+          keyboardType="numeric"
+          onChangeText={(value) =>
+            updateProteinContent(variety.id, task.code, { sampleMassGrams: value })
+          }
+        />
+        <Field
+          label="РњРµС‚РѕРґ Р°РЅР°Р»РёР·Р°"
+          value={draft.analysisMethod}
+          editable={false}
+          onChangeText={() => {}}
+        />
+        <Field
+          label="РЎРѕРґРµСЂР¶Р°РЅРёРµ Р±РµР»РєР°, %"
+          value={draft.proteinPercent || ''}
+          editable={!locked}
+          keyboardType="numeric"
+          onChangeText={(value) =>
+            updateProteinContent(variety.id, task.code, { proteinPercent: value })
+          }
+        />
+        {!locked ? (
+          <Button label={v2Copy.completeStep} onPress={() => void saveStep()} />
+        ) : (
+          <Button
+            label={v2Copy.returnToVariety}
+            variant="secondary"
+            onPress={() => returnToVariety(navigation, variety.id)}
+          />
+        )}
+        <Button label={v2Copy.back} variant="ghost" onPress={() => navigation.goBack()} />
+      </Card>
+    </Screen>
+  );
+}
+
+export function FatContentTaskScreen({
+  route,
+  navigation,
+}: NativeStackScreenProps<V2RootStackParamList, 'FatContentTask'>) {
+  const {
+    variety,
+    task,
+    taskDef,
+    updateFatContent,
+    completeTaskLocally,
+    queueTaskSubmission,
+  } = useTaskData(route.params.varietyId, route.params.taskCode);
+
+  if (!variety || !taskDef || !task.fatContent) {
+    return null;
+  }
+
+  const locked = Boolean(task.completedAt);
+  const draft = task.fatContent;
+
+  const saveStep = async () => {
+    try {
+      completeTaskLocally(variety.id, task.code);
+      await queueTaskSubmission(variety.id, task.code);
+      Alert.alert(v2Copy.doneTitle, v2Copy.taskQueuedDone);
+      returnToVariety(navigation, variety.id);
+    } catch (error) {
+      Alert.alert(
+        v2Copy.errorTitle,
+        error instanceof Error ? error.message : v2Copy.completeStepFailed,
+      );
+    }
+  };
+
+  return (
+    <Screen>
+      <TaskHeader title={task.title} subtitle={variety.title} intro={task.intro || ''} />
+      <TaskSamples taskCode={task.code} />
+      <Card>
+        <Text style={uiStyles.paragraph}>{taskDef.criterionText || ''}</Text>
+        <Text style={uiStyles.paragraph}>{`РРЋРЎвЂљРВ°РЎвЂљРЎС“РЎРѓ РЎв‚¬РВ°РС–РВ°: ${getFatContentStatusLabel(draft)}`}</Text>
+        <Text style={uiStyles.paragraph}>
+          {`Р РЋРЎвЂљР В°РЎвЂљРЎС“РЎРѓ Р Р…Р В°Р Р†Р ВµРЎРѓР С”Р С‘: ${
+            draft.sampleToleranceStatus === 'valid' ? 'РР† РТ‘РС•РС—РЎС“РЎРѓРС”РВµ' : 'РР†РР…РВµ РТ‘РС•РС—РЎС“РЎРѓРС”РВ°'
+          }`}
+        </Text>
+      </Card>
+      <Card>
+        <Field
+          label="Р ВРЎРѓРЎвЂљР С•РЎвЂЎР Р…Р С‘Р С” Р С—РЎР‚Р С•Р В±РЎвЂ№"
+          value={draft.sampleSource}
+          editable={false}
+          onChangeText={() => {}}
+        />
+        <Field
+          label="Р СљР В°РЎРѓРЎРѓР В° Р Р…Р В°Р Р†Р ВµРЎРѓР С”Р С‘, Рі"
+          value={draft.sampleMassGrams || ''}
+          editable={!locked}
+          keyboardType="numeric"
+          onChangeText={(value) =>
+            updateFatContent(variety.id, task.code, { sampleMassGrams: value })
+          }
+        />
+        <Field
+          label="Р СљР ВµРЎвЂљР С•Р Т‘ Р В°Р Р…Р В°Р В»Р С‘Р В·Р В°"
+          value={draft.analysisMethod}
+          editable={false}
+          onChangeText={() => {}}
+        />
+        <Field
+          label="Р РЋР С•Р Т‘Р ВµРЎР‚Р В¶Р В°Р Р…Р С‘Р Вµ Р В¶Р С‘РЎР‚Р В°, %"
+          value={draft.fatPercent || ''}
+          editable={!locked}
+          keyboardType="numeric"
+          onChangeText={(value) =>
+            updateFatContent(variety.id, task.code, { fatPercent: value })
+          }
+        />
+        {!locked ? (
+          <Button label={v2Copy.completeStep} onPress={() => void saveStep()} />
         ) : (
           <Button
             label={v2Copy.returnToVariety}
