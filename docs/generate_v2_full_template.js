@@ -21,23 +21,10 @@ Module._extensions['.ts'] = function registerTs(module, filename) {
 };
 
 const { templateService } = require(path.join(projectRoot, 'v2/src/services/templateService.ts'));
-const { SHEET_ALIASES } = require(path.join(projectRoot, 'v2/src/config/templateSchema.ts'));
+const { TEMPLATE_WORKSHEET_NAMES } = require(path.join(projectRoot, 'v2/src/config/templateSchema.ts'));
 
-const SAFE_SHEET_NAME_OVERRIDES = {
-  leaf_shape_sheet: '12.Лист_форма_листочка',
-  stem_pubescence_color_sheet: '14.Окраска_опушения_стебля',
-  yield_per_area_sheet: '26.Урожайность_ед_площади',
-  protein_content_sheet: '28.Содержание_белка',
-  fat_content_sheet: '29.Содержание_жира',
-  lower_pod_attachment_sheet: '18.Высота_нижнего_боба',
-  productive_nodes_sheet: '19.Продуктивные_узлы',
-  productive_pods_sheet: '21.Продуктивные_бобы',
-  pods_per_node_sheet: '22.Бобов_на_прод_узел',
-};
-
-function getSafeSheetName(logicalKey, originalName, usedNames) {
-  const preferred = SAFE_SHEET_NAME_OVERRIDES[logicalKey] || originalName;
-  const normalized = preferred.slice(0, 31);
+function getSafeSheetName(originalName, usedNames) {
+  const normalized = originalName.slice(0, 31);
   if (!usedNames.has(normalized)) {
     usedNames.add(normalized);
     return normalized;
@@ -53,30 +40,24 @@ function getSafeSheetName(logicalKey, originalName, usedNames) {
     suffix += 1;
   }
 
-  throw new Error(`Could not build unique sheet name for ${logicalKey}`);
+  throw new Error(`Could not build unique sheet name for ${originalName}`);
 }
 
 const workbookModel = templateService.createLocalWorkbookCopy();
-for (const alias of Object.values(SHEET_ALIASES)) {
-  if (!workbookModel[alias.local]) {
-    workbookModel[alias.local] = [];
+for (const sheetName of TEMPLATE_WORKSHEET_NAMES) {
+  if (!workbookModel[sheetName]) {
+    workbookModel[sheetName] = [];
   }
 }
 
 const wb = XLSX.utils.book_new();
 const usedNames = new Set();
-const mapRows = [['logicalSheetKey', 'currentAppSheetName', 'xlsxSheetName']];
-
-for (const [logicalKey, alias] of Object.entries(SHEET_ALIASES)) {
-  const sourceName = alias.local;
+for (const sourceName of TEMPLATE_WORKSHEET_NAMES) {
   const rows = workbookModel[sourceName] || [];
-  const safeName = getSafeSheetName(logicalKey, sourceName, usedNames);
+  const safeName = getSafeSheetName(sourceName, usedNames);
   const ws = XLSX.utils.aoa_to_sheet(rows);
   XLSX.utils.book_append_sheet(wb, ws, safeName);
-  mapRows.push([logicalKey, sourceName, safeName]);
 }
-
-XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(mapRows), '00.sheet_map');
 
 const outputPath = path.join(projectRoot, 'docs', 'sortoved_v2_full_template.xlsx');
 XLSX.writeFile(wb, outputPath);

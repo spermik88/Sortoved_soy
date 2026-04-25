@@ -10,7 +10,8 @@ import { V2RootStackParamList } from '../navigation/types';
 export function QueueScreen({
   navigation,
 }: NativeStackScreenProps<V2RootStackParamList, 'Queue'>) {
-  const { state, online, processQueue } = useV2App();
+  const { state, online, processQueue, reauthorizeAndResumeQueue } = useV2App();
+  const hasAuthWait = state.syncQueue.some((item) => item.status === 'waiting_for_auth');
 
   return (
     <Screen>
@@ -36,11 +37,29 @@ export function QueueScreen({
                   {v2Copy.queueItemError}: {item.lastError}
                 </Text>
               ) : null}
+              {item.cloudError ? (
+                <Text style={uiStyles.paragraph}>
+                  Google: {item.cloudError}
+                </Text>
+              ) : null}
+              <Text style={uiStyles.paragraph}>
+                Local: {item.localAppliedAt || 'pending'}
+              </Text>
+              <Text style={uiStyles.paragraph}>
+                Cloud: {item.cloudAppliedAt || (item.authRequired ? 'waiting auth' : 'pending')}
+              </Text>
             </Card>
           ))
         ) : (
           <EmptyState title={v2Copy.queueEmptyTitle} description={v2Copy.queueEmptyBody} />
         )}
+        {hasAuthWait ? (
+          <Button
+            label="Авторизоваться и продолжить Google sync"
+            variant="secondary"
+            onPress={() => void reauthorizeAndResumeQueue()}
+          />
+        ) : null}
         <Button label={v2Copy.queueRetry} onPress={() => void processQueue()} />
         <Button label={v2Copy.back} variant="ghost" onPress={() => navigation.goBack()} />
       </Card>

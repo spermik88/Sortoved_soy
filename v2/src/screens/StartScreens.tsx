@@ -10,7 +10,8 @@ import { V2RootStackParamList } from '../navigation/types';
 export function StartScreen({
   navigation,
 }: NativeStackScreenProps<V2RootStackParamList, 'Start'>) {
-  const { state } = useV2App();
+  const { state, signOut, beginCreation } = useV2App();
+  const hasSession = Boolean(state.session?.accessToken);
 
   return (
     <Screen>
@@ -18,7 +19,17 @@ export function StartScreen({
       <Card>
         <Text style={uiStyles.paragraph}>{v2Copy.startIntro}</Text>
         <Button label={v2Copy.startLink} onPress={() => navigation.navigate('Auth', { mode: 'link' })} />
-        <Button label={v2Copy.startCreate} onPress={() => navigation.navigate('Auth', { mode: 'create' })} />
+        <Button
+          label={v2Copy.startCreate}
+          onPress={() => {
+            if (hasSession) {
+              beginCreation();
+              navigation.navigate('Creation');
+              return;
+            }
+            navigation.navigate('Auth', { mode: 'create' });
+          }}
+        />
         <Button
           label={v2Copy.startCatalog}
           variant="secondary"
@@ -28,7 +39,21 @@ export function StartScreen({
         <Button label={v2Copy.startQueue} variant="ghost" onPress={() => navigation.navigate('Queue')} />
       </Card>
       <Card>
-        <StatPill label={v2Copy.googleDisabled} tone="warning" />
+        <StatPill
+          label={
+            hasSession
+              ? `Google: ${state.session?.email || 'авторизован'}`
+              : v2Copy.googleDisabled
+          }
+          tone={hasSession ? 'success' : 'warning'}
+        />
+        {hasSession ? (
+          <Button
+            label="Выйти из Google"
+            variant="secondary"
+            onPress={() => void signOut()}
+          />
+        ) : null}
       </Card>
     </Screen>
   );
@@ -38,11 +63,19 @@ export function AuthScreen({
   route,
   navigation,
 }: NativeStackScreenProps<V2RootStackParamList, 'Auth'>) {
-  const { prepareMode, importVarietyFromClipboard, beginCreation } = useV2App();
+  const { state, prepareMode, importVarietyFromClipboard, beginCreation } = useV2App();
 
   const proceed = async () => {
     try {
-      await prepareMode(route.params.mode);
+      if (route.params.mode === 'create') {
+        beginCreation();
+        navigation.replace('Creation');
+        return;
+      }
+
+      if (!state.session?.accessToken) {
+        await prepareMode(route.params.mode);
+      }
 
       if (route.params.mode === 'link') {
         await importVarietyFromClipboard();
@@ -53,8 +86,6 @@ export function AuthScreen({
         return;
       }
 
-      beginCreation();
-      navigation.replace('Creation');
     } catch (error) {
       Alert.alert(
         v2Copy.errorTitle,

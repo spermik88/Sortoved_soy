@@ -1,4 +1,5 @@
 import { taskDefinitionsByCode } from '../v2/src/config/flowRegistry';
+import { PLOTS_SHEET_NAME, TEMPLATE_WORKSHEET_NAMES } from '../v2/src/config/templateSchema';
 import { formatPhotoMeta } from '../v2/src/utils/format';
 import { isValidGoogleSheetsUrl } from '../v2/src/services/sheetsService';
 import {
@@ -60,6 +61,17 @@ describe('v2 core helpers', () => {
     expect(isValidGoogleSheetsUrl('https://example.com/not-sheets')).toBe(false);
   });
 
+  it('builds the full 31-sheet template contract', () => {
+    const workbook = templateService.createLocalWorkbookCopy();
+    const writes = templateService.buildCreationWrites(draft);
+
+    expect(TEMPLATE_WORKSHEET_NAMES).toHaveLength(31);
+    expect(TEMPLATE_WORKSHEET_NAMES[1]).toBe(PLOTS_SHEET_NAME);
+    expect(Object.keys(workbook)).toEqual(expect.arrayContaining([...TEMPLATE_WORKSHEET_NAMES]));
+    expect(writes.map((write) => write.sheet)).toEqual(expect.arrayContaining([...TEMPLATE_WORKSHEET_NAMES]));
+    expect(writes).toHaveLength(31);
+  });
+
   it('maps creation draft into workbook rows', () => {
     const workbook = templateService.createVarietyWorkbook(draft);
     expect(workbook['делянки'][1][1]).toBe('2026-04-21');
@@ -74,7 +86,7 @@ describe('v2 core helpers', () => {
 
   it('resolves disease blocks and counts rows independently', () => {
     const workbook = templateService.createLocalWorkbookCopy();
-    const sheet = workbook['Лист1'];
+    const sheet = workbook['1.Фузариоз'];
 
     expect(resolveDiseaseBlockColumns('1')).toEqual({
       anchor: 0,
@@ -113,12 +125,12 @@ describe('v2 core helpers', () => {
       userEmail: 'sample@mail.com',
     });
 
-    expect(first.sheetName).toBe('Лист1');
+    expect(first.sheetName).toBe('1.Фузариоз');
     expect(first.rowIndex).toBe(2);
-    expect(first.workbook['Лист1'][2][0]).toBe('№ряда_3, №растения_12');
-    expect(first.workbook['Лист1'][2][1]).toBe('photo_pending_upload');
-    expect(first.workbook['Лист1'][2][3]).toBe(1);
-    expect(first.workbook['Лист1'][2][4]).toBe('');
+    expect(first.workbook['1.Фузариоз'][2][0]).toBe('№ряда_3, №растения_12');
+    expect(first.workbook['1.Фузариоз'][2][1]).toBe('photo_pending_upload');
+    expect(first.workbook['1.Фузариоз'][2][3]).toBe(1);
+    expect(first.workbook['1.Фузариоз'][2][4]).toBe('');
 
     const second = templateService.applyDiseaseCardWrite(first.workbook, 'fusarium_sheet', {
       plot: '2',
@@ -128,10 +140,10 @@ describe('v2 core helpers', () => {
       userEmail: 'sample@mail.com',
     });
 
-    expect(second.workbook['Лист1'][2][5]).toBe('№ряда_9');
-    expect(second.workbook['Лист1'][2][6]).toBe('photo_pending_upload');
-    expect(second.workbook['Лист1'][2][8]).toBe(1);
-    expect(second.workbook['Лист1'][2][9]).toBe('');
+    expect(second.workbook['1.Фузариоз'][2][5]).toBe('№ряда_9');
+    expect(second.workbook['1.Фузариоз'][2][6]).toBe('photo_pending_upload');
+    expect(second.workbook['1.Фузариоз'][2][8]).toBe(1);
+    expect(second.workbook['1.Фузариоз'][2][9]).toBe('');
 
     const third = templateService.applyDiseaseCardWrite(second.workbook, 'septoria_sheet', {
       plot: '3',

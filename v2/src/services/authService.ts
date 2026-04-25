@@ -7,7 +7,7 @@ import { GoogleSession } from '../types/app';
 
 WebBrowser.maybeCompleteAuthSession();
 
-const STORAGE_KEY = 'sortoved-soy/google-session-v2';
+const STORAGE_KEY = 'sortoved-soy.google-session-v2';
 const discovery = {
   authorizationEndpoint: 'https://accounts.google.com/o/oauth2/v2/auth',
   tokenEndpoint: 'https://oauth2.googleapis.com/token',

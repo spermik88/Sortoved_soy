@@ -67,8 +67,19 @@ export type TaskUiStatus =
   | 'draft'
   | 'ready_local'
   | 'queued'
+  | 'waiting_for_auth'
+  | 'cloud_failed'
+  | 'locked_by_google'
   | 'analysis_invalid'
   | 'processed';
+
+export type TaskCloudStatus =
+  | 'idle'
+  | 'cloud_pending'
+  | 'waiting_for_auth'
+  | 'cloud_failed'
+  | 'cloud_synced'
+  | 'locked_by_google';
 
 export interface GoogleSession {
   accessToken: string;
@@ -88,6 +99,15 @@ export interface VarietySetupSnapshot {
   localWorkbookPath?: string;
   localWorkbook?: Record<string, (string | number | boolean)[][]>;
   sheetAliases?: Partial<Record<LocalSheetKey, string>>;
+  drive?: {
+    rootFolderId?: string;
+    rootFolderUrl?: string;
+    varietyFolderId?: string;
+    varietyFolderUrl?: string;
+    creatorEmail?: string;
+    foldersBySheet?: Record<string, { folderId: string; folderUrl?: string }>;
+  };
+  lastGoogleSyncAt?: string;
 }
 
 export interface VarietyRecord {
@@ -269,6 +289,9 @@ export interface InspectionTask {
   cardsCompleted: boolean;
   completedAt?: string;
   uiStatus: TaskUiStatus;
+  cloudStatus?: TaskCloudStatus;
+  cloudLockedAt?: string;
+  cloudSourceVersion?: string;
   cards: InspectionCardDraft[];
   phenologyPlots?: Record<'1' | '2' | '3', PhenologyPlotDraft>;
   choicePlots?: Record<'1' | '2' | '3', ChoicePlotDraft>;
@@ -284,6 +307,9 @@ export interface InspectionTask {
 export interface QueuedMediaUpload {
   localUri: string;
   remoteUrl?: string;
+  remoteId?: string;
+  targetSheet?: string;
+  capturedAt?: string;
   mimeType: string;
 }
 
@@ -308,6 +334,10 @@ export interface QueuedOperation {
   writes?: SheetWriteOperation[];
   media?: QueuedMediaUpload[];
   lastError?: string;
+  localAppliedAt?: string;
+  cloudAppliedAt?: string;
+  cloudError?: string;
+  authRequired?: boolean;
 }
 
 export interface ScreenMappingRule {

@@ -1,8 +1,12 @@
 import {
   EMPTY_TRAIT_SHEETS,
   GENERIC_TRAIT_HEADERS,
+  META_SHEET_NAME,
+  PHOTO_FOLDER_SHEET_NAMES,
+  PLOTS_SHEET_NAME,
   SHEET_ALIASES,
   TEMPLATE_SHEETS,
+  TEMPLATE_VERSION,
 } from '../config/templateSchema';
 import {
   ChoicePlotDraft,
@@ -28,6 +32,7 @@ import {
   YieldPlotDraft,
   YieldSheetKey,
   VarietyCreationDraft,
+  VarietySetupSnapshot,
   VarietyRecord,
 } from '../types/app';
 import { formatPhotoMeta } from '../utils/format';
@@ -386,13 +391,55 @@ function buildTemplateWorkbook() {
   return workbook;
 }
 
+export function buildMetaSheetRows(setup: VarietySetupSnapshot) {
+  const drive = setup.drive || {};
+  return [
+    ['key', 'value'],
+    ['templateVersion', TEMPLATE_VERSION],
+    ['creatorEmail', drive.creatorEmail || ''],
+    ['rootFolderId', drive.rootFolderId || ''],
+    ['rootFolderUrl', drive.rootFolderUrl || ''],
+    ['varietyFolderId', drive.varietyFolderId || ''],
+    ['varietyFolderUrl', drive.varietyFolderUrl || ''],
+    [],
+    ['sheetName', 'folderId', 'folderUrl'],
+    ...PHOTO_FOLDER_SHEET_NAMES.map((sheetName) => [
+      sheetName,
+      drive.foldersBySheet?.[sheetName]?.folderId || '',
+      drive.foldersBySheet?.[sheetName]?.folderUrl || '',
+    ]),
+  ];
+}
+
+export function parseMetaSheetRows(rows: (string | number | boolean)[][]): VarietySetupSnapshot['drive'] {
+  const drive: NonNullable<VarietySetupSnapshot['drive']> = { foldersBySheet: {} };
+  rows.slice(1, 7).forEach((row) => {
+    const key = String(row[0] || '');
+    const value = String(row[1] || '');
+    if (key === 'creatorEmail') drive.creatorEmail = value;
+    if (key === 'rootFolderId') drive.rootFolderId = value;
+    if (key === 'rootFolderUrl') drive.rootFolderUrl = value;
+    if (key === 'varietyFolderId') drive.varietyFolderId = value;
+    if (key === 'varietyFolderUrl') drive.varietyFolderUrl = value;
+  });
+  rows.slice(9).forEach((row) => {
+    const sheetName = String(row[0] || '');
+    const folderId = String(row[1] || '');
+    const folderUrl = String(row[2] || '');
+    if (sheetName && folderId) {
+      drive.foldersBySheet![sheetName] = { folderId, folderUrl };
+    }
+  });
+  return drive;
+}
+
 function setDeliankaValue(
   workbook: Workbook,
   header: string,
   plot: Plot,
   value: string | number | boolean,
 ) {
-  const sheet = workbook['делянки'];
+  const sheet = workbook[PLOTS_SHEET_NAME];
   const headerIndex = sheet[0].findIndex((item) => item === header);
   const rowIndex = sheet.findIndex((row) => row[0] === `делянка ${plot}`);
   if (headerIndex === -1 || rowIndex === -1) {
@@ -514,6 +561,7 @@ export interface FatContentStepWriteResult {
 export interface TemplateService {
   createVarietyWorkbook(draft: VarietyCreationDraft): Workbook;
   buildCreationWrites(draft: VarietyCreationDraft): SheetWriteOperation[];
+  buildMetaWrite(setup: VarietySetupSnapshot): SheetWriteOperation;
   buildTaskWrites(
     variety: VarietyRecord,
     task: InspectionTask,
@@ -610,6 +658,15 @@ class WorkbookTemplateService implements TemplateService {
       range: `${sheet}!A1`,
       values,
     }));
+  }
+
+  buildMetaWrite(setup: VarietySetupSnapshot) {
+    return {
+      strategy: 'replace' as const,
+      sheet: META_SHEET_NAME,
+      range: `${META_SHEET_NAME}!A1`,
+      values: buildMetaSheetRows(setup),
+    };
   }
 
   applyDiseaseCardWrite(

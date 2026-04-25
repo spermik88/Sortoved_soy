@@ -165,3 +165,17 @@ export const v2Copy = {
   noMap: 'карта не указана',
   returnToVariety: 'Вернуться к сорту',
 } as const;
+
+Object.assign(taskStatusLabels, {
+  waiting_for_auth: 'Ожидает авторизацию',
+  cloud_failed: 'Ошибка Google sync',
+  locked_by_google: 'Заполнено в Google',
+  analysis_invalid: 'Ошибка анализа',
+});
+
+Object.assign(v2Copy, {
+  startSubtitle: 'v2: локальные экраны и Google sync',
+  googleDisabled: 'Google sync доступен после авторизации',
+  queueIntro:
+    'Очередь выполняет локальное применение, затем облачную запись в Google Sheets. Фото сначала загружаются в Google Drive, после этого URL записывается в таблицу.',
+});

@@ -10,14 +10,24 @@ import React, {
 
 import { v2Copy } from '../config/copy';
 import { creationSteps, taskDefinitionsByCode } from '../config/flowRegistry';
-import { SHEET_ALIASES } from '../config/templateSchema';
+import {
+  PHOTO_FOLDER_SHEET_NAMES,
+  PLOTS_SHEET_NAME,
+  SHEET_ALIASES,
+  TEMPLATE_WORKSHEET_NAMES,
+} from '../config/templateSchema';
 import { v2Repository } from '../repositories/v2Repository';
+import { authService } from '../services/authService';
 import { clipboardService } from '../services/clipboardService';
+import { driveService } from '../services/driveService';
+import { syncTaskReadState } from '../services/googleSyncService';
 import { locationService } from '../services/locationService';
 import { isInternetReachable, subscribeToNetwork } from '../services/networkService';
-import { isValidGoogleSheetsUrl } from '../services/sheetsService';
+import { isValidGoogleSheetsUrl, sheetsService } from '../services/sheetsService';
+import { processQueuedOperation } from '../services/syncQueueService';
 import {
   calculateYieldTonsPerHectare,
+  parseMetaSheetRows,
   resolveProteinToleranceStatus,
   resolveThousandSeedWeightOutcome,
   templateService,
@@ -52,6 +62,7 @@ import {
   YieldSheetKey,
   VarietyCreationDraft,
   VarietyRecord,
+  VarietySetupSnapshot,
 } from '../types/app';
 import { normalizeTitle, todayIsoDate } from '../utils/format';
 import { createId } from '../utils/id';
@@ -75,6 +86,7 @@ const initialState: PersistedV2State = {
   inspections: {},
   syncQueue: [],
 };
+const LOCAL_PHOTO_RETENTION_MS = 90 * 24 * 60 * 60 * 1000;
 
 function buildLocalBinding(
   varietyId: string,
@@ -96,6 +108,46 @@ function buildImportedVarietyTitle(rawUrl: string) {
   } catch {
     return v2Copy.importedVarietyFallback;
   }
+}
+
+function sanitizeDriveName(value: string) {
+  return normalizeTitle(value).replace(/[\\/:*?"<>|]+/g, '_').replace(/\s+/g, '_') || 'variety';
+}
+
+function driveFolderTimestamp(date = new Date()) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}_${String(date.getHours()).padStart(2, '0')}-${String(date.getMinutes()).padStart(2, '0')}`;
+}
+
+async function createDriveSetup(
+  accessToken: string,
+  title: string,
+  creatorEmail?: string,
+): Promise<NonNullable<VarietySetupSnapshot['drive']>> {
+  const root = await driveService.findOrCreateFolder(accessToken, 'Sortoved');
+  const varietyFolder = await driveService.createFolder(
+    accessToken,
+    `${sanitizeDriveName(title)}_${driveFolderTimestamp()}`,
+    root.id,
+  );
+  await driveService.shareFolderForEditingByLink(accessToken, varietyFolder.id);
+
+  const foldersBySheet: NonNullable<NonNullable<VarietySetupSnapshot['drive']>['foldersBySheet']> = {};
+  for (const sheetName of PHOTO_FOLDER_SHEET_NAMES) {
+    const folder = await driveService.createFolder(accessToken, sheetName, varietyFolder.id);
+    foldersBySheet[sheetName] = {
+      folderId: folder.id,
+      folderUrl: folder.webViewLink,
+    };
+  }
+
+  return {
+    rootFolderId: root.id,
+    rootFolderUrl: root.webViewLink,
+    varietyFolderId: varietyFolder.id,
+    varietyFolderUrl: varietyFolder.webViewLink,
+    creatorEmail,
+    foldersBySheet,
+  };
 }
 
 function createWorkbookSetup(varietyId: string, draft?: VarietyCreationDraft) {
@@ -157,6 +209,18 @@ function getTaskUiStatus(
   task: InspectionTask,
   queue: QueuedOperation[],
 ): TaskUiStatus {
+  if (task.cloudStatus === 'locked_by_google') {
+    return 'locked_by_google';
+  }
+
+  if (task.cloudStatus === 'waiting_for_auth') {
+    return 'waiting_for_auth';
+  }
+
+  if (task.cloudStatus === 'cloud_failed') {
+    return 'cloud_failed';
+  }
+
   if (task.flowKind === 'disease_cards') {
     if (!task.cards.length) {
       return 'not_started';
@@ -184,7 +248,7 @@ function getTaskUiStatus(
       return 'processed';
     }
 
-    if (taskQueue && ['queued', 'processing', 'failed'].includes(taskQueue.status)) {
+    if (taskQueue && ['queued', 'processing', 'failed', 'waiting_for_auth'].includes(taskQueue.status)) {
       return 'queued';
     }
 
@@ -207,7 +271,7 @@ function getTaskUiStatus(
       return 'processed';
     }
 
-    if (taskQueue && ['queued', 'processing', 'failed'].includes(taskQueue.status)) {
+    if (taskQueue && ['queued', 'processing', 'failed', 'waiting_for_auth'].includes(taskQueue.status)) {
       return 'queued';
     }
 
@@ -230,7 +294,7 @@ function getTaskUiStatus(
       return 'processed';
     }
 
-    if (taskQueue && ['queued', 'processing', 'failed'].includes(taskQueue.status)) {
+    if (taskQueue && ['queued', 'processing', 'failed', 'waiting_for_auth'].includes(taskQueue.status)) {
       return 'queued';
     }
 
@@ -253,7 +317,7 @@ function getTaskUiStatus(
       return 'processed';
     }
 
-    if (taskQueue && ['queued', 'processing', 'failed'].includes(taskQueue.status)) {
+    if (taskQueue && ['queued', 'processing', 'failed', 'waiting_for_auth'].includes(taskQueue.status)) {
       return 'queued';
     }
 
@@ -702,9 +766,14 @@ function normalizeInspections(
 }
 
 function normalizeState(stored: PersistedV2State): PersistedV2State {
+  const cutoff = Date.now() - LOCAL_PHOTO_RETENTION_MS;
+  const syncQueue = stored.syncQueue.filter(
+    (entry) => entry.cloudAppliedAt || new Date(entry.createdAt).getTime() >= cutoff,
+  );
   return {
     ...stored,
-    inspections: normalizeInspections(stored.inspections, stored.syncQueue),
+    syncQueue,
+    inspections: normalizeInspections(stored.inspections, syncQueue),
   };
 }
 
@@ -713,6 +782,8 @@ interface V2ContextValue {
   state: PersistedV2State;
   online: boolean;
   prepareMode(mode: AuthMode): Promise<void>;
+  signOut(): Promise<void>;
+  reauthorizeAndResumeQueue(): Promise<void>;
   importVarietyFromClipboard(): Promise<void>;
   beginCreation(): void;
   cancelCreation(): void;
@@ -726,6 +797,7 @@ interface V2ContextValue {
   completeCreation(): Promise<VarietyRecord>;
   getVariety(varietyId: string): VarietyRecord | undefined;
   getTask(varietyId: string, taskCode: string): InspectionTask;
+  refreshTaskReadState(varietyId: string, taskCode: string): Promise<InspectionTask>;
   saveOverviewPhoto(varietyId: string, taskCode: string, uri: string): void;
   markOverviewComplete(varietyId: string, taskCode: string): void;
   addTaskCard(varietyId: string, taskCode: string): void;
@@ -820,11 +892,49 @@ export function V2AppProvider({ children }: { children: ReactNode }) {
   }, [state]);
 
   useEffect(() => {
-    Promise.all([v2Repository.load(), isInternetReachable()]).then(([stored, isOnline]) => {
+    let cancelled = false;
+
+    async function hydrate() {
+      const [storedResult, onlineResult, sessionResult] = await Promise.allSettled([
+        v2Repository.load(),
+        isInternetReachable(),
+        authService.restoreSession(),
+      ]);
+
+      if (cancelled) {
+        return;
+      }
+
+      if (storedResult.status === 'rejected') {
+        console.error('Failed to load v2 state from storage', storedResult.reason);
+      }
+
+      if (onlineResult.status === 'rejected') {
+        console.error('Failed to resolve network state during v2 hydration', onlineResult.reason);
+      }
+
+      if (sessionResult.status === 'rejected') {
+        console.error('Failed to restore auth session during v2 hydration', sessionResult.reason);
+      }
+
+      const stored = storedResult.status === 'fulfilled' ? storedResult.value : null;
+      const isOnline = onlineResult.status === 'fulfilled' ? onlineResult.value : true;
+      const restoredSession = sessionResult.status === 'fulfilled' ? sessionResult.value : null;
+      const nextState = stored ? normalizeState(stored) : initialState;
+
       setOnline(isOnline);
-      setState(stored ? normalizeState(stored) : initialState);
+      setState({
+        ...nextState,
+        session: restoredSession || nextState.session,
+      });
       setHydrated(true);
-    });
+    }
+
+    void hydrate();
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   useEffect(() => {
@@ -838,10 +948,19 @@ export function V2AppProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const sub = subscribeToNetwork((isConnected) => {
       setOnline(isConnected);
+      if (isConnected) {
+        void processQueueInternal();
+      }
     });
 
     return () => sub.remove();
   }, []);
+
+  useEffect(() => {
+    if (hydrated && online) {
+      void processQueueInternal();
+    }
+  }, [hydrated, online]);
 
   async function processDiseaseCardOperation(item: QueuedOperation) {
     const payload = item.payload as Record<string, unknown>;
@@ -888,6 +1007,7 @@ export function V2AppProvider({ children }: { children: ReactNode }) {
               status: 'synced',
               updatedAt: new Date().toISOString(),
               lastError: undefined,
+              localAppliedAt: entry.localAppliedAt || new Date().toISOString(),
             } satisfies QueuedOperation)
           : entry,
       );
@@ -977,6 +1097,7 @@ export function V2AppProvider({ children }: { children: ReactNode }) {
               status: 'synced',
               updatedAt: new Date().toISOString(),
               lastError: undefined,
+              localAppliedAt: entry.localAppliedAt || new Date().toISOString(),
             } satisfies QueuedOperation)
           : entry,
       );
@@ -1059,6 +1180,7 @@ export function V2AppProvider({ children }: { children: ReactNode }) {
               status: 'synced',
               updatedAt: new Date().toISOString(),
               lastError: undefined,
+              localAppliedAt: entry.localAppliedAt || new Date().toISOString(),
             } satisfies QueuedOperation)
           : entry,
       );
@@ -1141,6 +1263,7 @@ export function V2AppProvider({ children }: { children: ReactNode }) {
               status: 'synced',
               updatedAt: new Date().toISOString(),
               lastError: undefined,
+              localAppliedAt: entry.localAppliedAt || new Date().toISOString(),
             } satisfies QueuedOperation)
           : entry,
       );
@@ -1223,6 +1346,7 @@ export function V2AppProvider({ children }: { children: ReactNode }) {
               status: 'synced',
               updatedAt: new Date().toISOString(),
               lastError: undefined,
+              localAppliedAt: entry.localAppliedAt || new Date().toISOString(),
             } satisfies QueuedOperation)
           : entry,
       );
@@ -1313,6 +1437,7 @@ export function V2AppProvider({ children }: { children: ReactNode }) {
               status: 'synced',
               updatedAt: new Date().toISOString(),
               lastError: undefined,
+              localAppliedAt: entry.localAppliedAt || new Date().toISOString(),
             } satisfies QueuedOperation)
           : entry,
       );
@@ -1396,6 +1521,7 @@ export function V2AppProvider({ children }: { children: ReactNode }) {
               status: 'synced',
               updatedAt: new Date().toISOString(),
               lastError: undefined,
+              localAppliedAt: entry.localAppliedAt || new Date().toISOString(),
             } satisfies QueuedOperation)
           : entry,
       );
@@ -1479,6 +1605,7 @@ export function V2AppProvider({ children }: { children: ReactNode }) {
               status: 'synced',
               updatedAt: new Date().toISOString(),
               lastError: undefined,
+              localAppliedAt: entry.localAppliedAt || new Date().toISOString(),
             } satisfies QueuedOperation)
           : entry,
       );
@@ -1558,6 +1685,7 @@ export function V2AppProvider({ children }: { children: ReactNode }) {
               status: 'synced',
               updatedAt: new Date().toISOString(),
               lastError: undefined,
+              localAppliedAt: entry.localAppliedAt || new Date().toISOString(),
             } satisfies QueuedOperation)
           : entry,
       );
@@ -1608,7 +1736,7 @@ export function V2AppProvider({ children }: { children: ReactNode }) {
   async function processQueueInternal(queueOverride?: QueuedOperation[]) {
     const queue = queueOverride || stateRef.current.syncQueue;
     for (const item of queue) {
-      if (!['queued', 'failed'].includes(item.status)) {
+      if (!['queued', 'failed'].includes(item.status) || item.localAppliedAt) {
         continue;
       }
 
@@ -1708,6 +1836,7 @@ export function V2AppProvider({ children }: { children: ReactNode }) {
                   status: 'synced',
                   updatedAt: new Date().toISOString(),
                   lastError: undefined,
+                  localAppliedAt: entry.localAppliedAt || new Date().toISOString(),
                 } satisfies QueuedOperation)
               : entry,
           );
@@ -1802,6 +1931,129 @@ export function V2AppProvider({ children }: { children: ReactNode }) {
         });
       }
     }
+
+    const cloudQueue = (queueOverride || stateRef.current.syncQueue).filter(
+      (item) =>
+        ['synced', 'failed'].includes(item.status) &&
+        item.localAppliedAt &&
+        !item.cloudAppliedAt,
+    );
+
+    for (const item of cloudQueue) {
+      try {
+        const payload = item.payload as Record<string, unknown>;
+        const taskCode = String(payload.taskCode || item.screenId || '');
+        await processQueuedOperation(item, {
+          session: stateRef.current.session,
+          catalog: stateRef.current.catalog,
+          task:
+            item.varietyId && taskCode
+              ? stateRef.current.inspections[item.varietyId]?.[taskCode]
+              : undefined,
+        });
+
+        setState((current) => {
+          const payload = item.payload as Record<string, unknown>;
+          const taskCode = String(payload.taskCode || item.screenId || '');
+          const nextQueue = current.syncQueue.map((entry) =>
+            entry.id === item.id
+              ? ({
+                  ...entry,
+                  status: 'synced',
+                  updatedAt: new Date().toISOString(),
+                  cloudAppliedAt: new Date().toISOString(),
+                  cloudError: undefined,
+                  authRequired: false,
+                } satisfies QueuedOperation)
+              : entry,
+          );
+
+          const existingTask =
+            item.varietyId && taskCode
+              ? current.inspections[item.varietyId]?.[taskCode]
+              : undefined;
+          const nextTask =
+            item.varietyId && existingTask
+              ? ({
+                  ...existingTask,
+                  cloudStatus: 'cloud_synced',
+                  updatedAt: new Date().toISOString(),
+                } satisfies InspectionTask)
+              : undefined;
+
+          return {
+            ...current,
+            syncQueue: nextQueue,
+            inspections:
+              item.varietyId && taskCode && nextTask
+                ? {
+                    ...current.inspections,
+                    [item.varietyId]: {
+                      ...current.inspections[item.varietyId],
+                      [taskCode]: {
+                        ...nextTask,
+                        uiStatus: getTaskUiStatus(item.varietyId, nextTask, nextQueue),
+                      },
+                    },
+                  }
+                : current.inspections,
+          };
+        });
+      } catch (error) {
+        const isAuthRequired =
+          error instanceof Error &&
+          'authRequired' in error &&
+          Boolean((error as Error & { authRequired?: boolean }).authRequired);
+
+        setState((current) => {
+          const payload = item.payload as Record<string, unknown>;
+          const taskCode = String(payload.taskCode || item.screenId || '');
+          const nextQueue = current.syncQueue.map((entry) =>
+            entry.id === item.id
+              ? ({
+                  ...entry,
+                  status: isAuthRequired ? 'waiting_for_auth' : 'failed',
+                  updatedAt: new Date().toISOString(),
+                  retryCount: isAuthRequired ? entry.retryCount : entry.retryCount + 1,
+                  cloudError: error instanceof Error ? error.message : v2Copy.localSyncError,
+                  authRequired: isAuthRequired,
+                } satisfies QueuedOperation)
+              : entry,
+          );
+          const existingTask =
+            item.varietyId && taskCode
+              ? current.inspections[item.varietyId]?.[taskCode]
+              : undefined;
+          const nextTask =
+            item.varietyId && existingTask
+              ? ({
+                  ...existingTask,
+                  cloudStatus: isAuthRequired ? 'waiting_for_auth' : 'cloud_failed',
+                  updatedAt: new Date().toISOString(),
+                } satisfies InspectionTask)
+              : undefined;
+
+          return {
+            ...current,
+            syncQueue: nextQueue,
+            pendingAuthMode: isAuthRequired ? current.pendingAuthMode || 'link' : current.pendingAuthMode,
+            inspections:
+              item.varietyId && taskCode && nextTask
+                ? {
+                    ...current.inspections,
+                    [item.varietyId]: {
+                      ...current.inspections[item.varietyId],
+                      [taskCode]: {
+                        ...nextTask,
+                        uiStatus: getTaskUiStatus(item.varietyId, nextTask, nextQueue),
+                      },
+                    },
+                  }
+                : current.inspections,
+          };
+        });
+      }
+    }
   }
 
   function getTaskFromState(
@@ -1883,6 +2135,46 @@ export function V2AppProvider({ children }: { children: ReactNode }) {
       online,
       async prepareMode(mode) {
         setState((current) => ({ ...current, pendingAuthMode: mode }));
+        const session = await authService.signIn();
+        setState((current) => ({ ...current, session, pendingAuthMode: mode }));
+      },
+      async signOut() {
+        await authService.signOut(stateRef.current.session);
+        setState((current) => ({
+          ...current,
+          session: null,
+          syncQueue: current.syncQueue.map((entry) =>
+            entry.cloudAppliedAt
+              ? entry
+              : ({
+                  ...entry,
+                  status: entry.localAppliedAt ? 'waiting_for_auth' : entry.status,
+                  authRequired: entry.localAppliedAt ? true : entry.authRequired,
+                  updatedAt: new Date().toISOString(),
+                } satisfies QueuedOperation),
+          ),
+        }));
+      },
+      async reauthorizeAndResumeQueue() {
+        const session = await authService.signIn();
+        const resumedQueue = stateRef.current.syncQueue.map((entry) =>
+          entry.status === 'waiting_for_auth'
+            ? ({
+                ...entry,
+                status: 'synced',
+                authRequired: false,
+                updatedAt: new Date().toISOString(),
+              } satisfies QueuedOperation)
+            : entry,
+        );
+        setState((current) => ({
+          ...current,
+          session,
+          pendingAuthMode: null,
+          syncQueue: resumedQueue,
+        }));
+
+        await processQueueInternal(resumedQueue);
       },
       async importVarietyFromClipboard() {
         const raw = await clipboardService.readString();
@@ -1895,13 +2187,36 @@ export function V2AppProvider({ children }: { children: ReactNode }) {
 
         const now = new Date().toISOString();
         const varietyId = createId('variety');
-        const title = buildImportedVarietyTitle(raw);
+        const session = stateRef.current.session;
+        if (!session?.accessToken) {
+          throw new Error('Сначала выполните авторизацию Google');
+        }
+        const inspected = await sheetsService.inspectSpreadsheet(session.accessToken, raw);
+        if (inspected.missingTemplateSheets.length) {
+          throw new Error(
+            `Google-таблица не соответствует шаблону сорта. Нет листов: ${inspected.missingTemplateSheets.join(', ')}`,
+          );
+        }
+        const metaRows = await sheetsService.readSheet(session.accessToken, inspected.spreadsheetId, '00.meta');
+        const drive = parseMetaSheetRows(metaRows);
+        if (!drive?.varietyFolderId) {
+          throw new Error('В таблице не найдена Drive-папка сорта. Добавьте сорт, созданный приложением.');
+        }
+        await driveService.assertFolderWritable(session.accessToken, drive.varietyFolderId);
+        const title = inspected.title || buildImportedVarietyTitle(raw);
         const record: VarietyRecord = {
           id: varietyId,
           title,
           source: 'linked',
-          binding: buildLocalBinding(varietyId, title, 'linked', raw),
-          setup: createWorkbookSetup(varietyId),
+          binding: {
+            spreadsheetId: inspected.spreadsheetId,
+            spreadsheetUrl: inspected.spreadsheetUrl,
+          },
+          setup: {
+            ...createWorkbookSetup(varietyId),
+            sheetAliases: inspected.sheetAliases,
+            drive,
+          },
           createdAt: now,
           updatedAt: now,
           status: 'ready',
@@ -1979,8 +2294,12 @@ export function V2AppProvider({ children }: { children: ReactNode }) {
       },
       async completeCreation() {
         const draft = stateRef.current.creationDraft;
+        const session = stateRef.current.session;
         if (!draft) {
           throw new Error(v2Copy.creationDraftMissing);
+        }
+        if (!session?.accessToken) {
+          throw new Error('Сначала выполните авторизацию Google');
         }
 
         const title = normalizeTitle(draft.varietyName);
@@ -1989,21 +2308,45 @@ export function V2AppProvider({ children }: { children: ReactNode }) {
         }
 
         const varietyId = createId('variety');
-        const workbookWrites = templateService.buildCreationWrites(draft);
         const now = new Date().toISOString();
+        const drive = await createDriveSetup(session.accessToken, title, session.email);
+        const setupSnapshot: VarietySetupSnapshot = {
+          mapsUrl: draft.mapsUrl,
+          plotPhotos: {
+            '1': draft.plots['1'].photoUri,
+            '2': draft.plots['2'].photoUri,
+            '3': draft.plots['3'].photoUri,
+          },
+          ...createWorkbookSetup(varietyId, draft),
+          drive,
+        };
+        if (setupSnapshot.localWorkbook) {
+          setupSnapshot.localWorkbook['00.meta'] = templateService.buildMetaWrite(setupSnapshot).values;
+        }
+        const workbookWrites = templateService
+          .buildCreationWrites(draft)
+          .map((write) => (write.sheet === '00.meta' ? templateService.buildMetaWrite(setupSnapshot) : write));
+        const remoteSheets = [...TEMPLATE_WORKSHEET_NAMES];
+        const createdSpreadsheet = await sheetsService.createSpreadsheet(
+          session.accessToken,
+          title,
+          remoteSheets,
+        );
+        const inspectedSpreadsheet = await sheetsService.inspectSpreadsheet(
+          session.accessToken,
+          createdSpreadsheet.spreadsheetUrl,
+        );
         const record: VarietyRecord = {
           id: varietyId,
           title,
           source: 'created',
-          binding: buildLocalBinding(varietyId, title, 'created'),
+          binding: {
+            spreadsheetId: inspectedSpreadsheet.spreadsheetId,
+            spreadsheetUrl: inspectedSpreadsheet.spreadsheetUrl,
+          },
           setup: {
-            mapsUrl: draft.mapsUrl,
-            plotPhotos: {
-              '1': draft.plots['1'].photoUri,
-              '2': draft.plots['2'].photoUri,
-              '3': draft.plots['3'].photoUri,
-            },
-            ...createWorkbookSetup(varietyId, draft),
+            ...setupSnapshot,
+            sheetAliases: inspectedSpreadsheet.sheetAliases,
           },
           createdAt: now,
           updatedAt: now,
@@ -2026,6 +2369,8 @@ export function V2AppProvider({ children }: { children: ReactNode }) {
             .map((plot) => ({
               localUri: draft.plots[plot].photoUri as string,
               mimeType: 'image/jpeg',
+              targetSheet: PLOTS_SHEET_NAME,
+              capturedAt: now,
             })),
         };
 
@@ -2045,6 +2390,20 @@ export function V2AppProvider({ children }: { children: ReactNode }) {
       },
       getTask(varietyId, taskCode) {
         return getTaskFromState(state, varietyId, taskCode);
+      },
+      async refreshTaskReadState(varietyId, taskCode) {
+        const variety = stateRef.current.catalog.find((item) => item.id === varietyId);
+        const task = getTaskInternal(varietyId, taskCode);
+        const session = stateRef.current.session;
+        if (!variety || !session?.accessToken) {
+          return task;
+        }
+
+        const syncedTask = await syncTaskReadState(session.accessToken, variety, task);
+        if (syncedTask !== task) {
+          saveTask(varietyId, taskCode, syncedTask);
+        }
+        return syncedTask;
       },
       saveOverviewPhoto(varietyId, taskCode, uri) {
         const currentTask = getTaskInternal(varietyId, taskCode);
@@ -2509,7 +2868,14 @@ export function V2AppProvider({ children }: { children: ReactNode }) {
               capturedLocation: currentCard.capturedLocation,
             },
             media: currentCard.photoUri
-              ? [{ localUri: currentCard.photoUri, mimeType: 'image/jpeg' }]
+              ? [{
+                  localUri: currentCard.photoUri,
+                  mimeType: 'image/jpeg',
+                  targetSheet: taskDef.logicalSheetKey
+                    ? SHEET_ALIASES[taskDef.logicalSheetKey].futureRemote
+                    : currentTask.title,
+                  capturedAt: currentCard.capturedAt,
+                }]
               : [],
           };
 
@@ -2701,12 +3067,14 @@ export function V2AppProvider({ children }: { children: ReactNode }) {
                   logicalSheetKey: taskDef.logicalSheetKey,
                   plots: task.phenologyPlots,
                 },
-                media: Object.values(task.phenologyPlots || {})
-                  .filter((plot) => plot.photoUri)
-                  .map((plot) => ({
-                    localUri: plot.photoUri as string,
-                    mimeType: 'image/jpeg' as const,
-                  })),
+                  media: Object.values(task.phenologyPlots || {})
+                    .filter((plot) => plot.photoUri)
+                    .map((plot) => ({
+                      localUri: plot.photoUri as string,
+                      mimeType: 'image/jpeg' as const,
+                      targetSheet: taskDef.logicalSheetKey ? SHEET_ALIASES[taskDef.logicalSheetKey].futureRemote : task.title,
+                      capturedAt: plot.capturedAt,
+                    })),
               }
             : task.flowKind === 'choice_by_plot'
               ? {
@@ -2730,6 +3098,8 @@ export function V2AppProvider({ children }: { children: ReactNode }) {
                     .map((plot) => ({
                       localUri: plot.photoUri as string,
                       mimeType: 'image/jpeg' as const,
+                      targetSheet: taskDef.logicalSheetKey ? SHEET_ALIASES[taskDef.logicalSheetKey].futureRemote : task.title,
+                      capturedAt: plot.capturedAt,
                     })),
                 }
               : task.flowKind === 'score_by_plot'
@@ -2754,6 +3124,8 @@ export function V2AppProvider({ children }: { children: ReactNode }) {
                       .map((plot) => ({
                         localUri: plot.photoUri as string,
                         mimeType: 'image/jpeg' as const,
+                        targetSheet: taskDef.logicalSheetKey ? SHEET_ALIASES[taskDef.logicalSheetKey].futureRemote : task.title,
+                        capturedAt: plot.capturedAt,
                       })),
                   }
               : task.flowKind === 'yield_by_plot'
@@ -2855,6 +3227,8 @@ export function V2AppProvider({ children }: { children: ReactNode }) {
                       .map((card) => ({
                         localUri: card.photoUri as string,
                         mimeType: 'image/jpeg' as const,
+                        targetSheet: taskDef.logicalSheetKey ? SHEET_ALIASES[taskDef.logicalSheetKey].futureRemote : task.title,
+                        capturedAt: card.capturedAt,
                       })),
                   }
             : {
@@ -2879,13 +3253,20 @@ export function V2AppProvider({ children }: { children: ReactNode }) {
                 ),
                 media: [
                   ...(task.overviewPhotoUri
-                    ? [{ localUri: task.overviewPhotoUri, mimeType: 'image/jpeg' as const }]
+                    ? [{
+                        localUri: task.overviewPhotoUri,
+                        mimeType: 'image/jpeg' as const,
+                        targetSheet: taskDef?.futureRemoteSheetName || task.title,
+                        capturedAt: task.completedAt,
+                      }]
                     : []),
                   ...task.cards
                     .filter((card) => card.photoUri)
                     .map((card) => ({
                       localUri: card.photoUri as string,
                       mimeType: 'image/jpeg' as const,
+                      targetSheet: taskDef?.futureRemoteSheetName || task.title,
+                      capturedAt: card.capturedAt,
                     })),
                 ],
               };

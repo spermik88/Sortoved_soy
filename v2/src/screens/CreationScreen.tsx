@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Alert, Text, View } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 
@@ -32,6 +32,9 @@ export function CreationScreen({
     completeCreation,
   } = useV2App();
   const draft = state.creationDraft;
+  const [driveConsentAccepted, setDriveConsentAccepted] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
 
   if (!draft) {
     navigation.replace('Start');
@@ -43,7 +46,9 @@ export function CreationScreen({
   const plotDraft = currentPlot ? draft.plots[currentPlot] : undefined;
 
   const canContinue =
-    currentCreationStep.type === 'text'
+    isLast && !driveConsentAccepted
+      ? false
+      : currentCreationStep.type === 'text'
       ? Boolean(draft.varietyName.trim())
       : currentCreationStep.type === 'location'
         ? Boolean(draft.mapsUrl)
@@ -54,8 +59,10 @@ export function CreationScreen({
             : true;
 
   const onNext = async () => {
+    setSubmitError(null);
     try {
       if (isLast) {
+        setSubmitting(true);
         const variety = await completeCreation();
         navigation.reset({
           index: 1,
@@ -69,10 +76,14 @@ export function CreationScreen({
 
       await nextCreationStep();
     } catch (error) {
+      const message = error instanceof Error ? error.message : v2Copy.saveStepFailed;
+      setSubmitError(message);
       Alert.alert(
         v2Copy.errorTitle,
-        error instanceof Error ? error.message : v2Copy.saveStepFailed,
+        message,
       );
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -182,6 +193,19 @@ export function CreationScreen({
           </>
         ) : null}
 
+        {isLast ? (
+          <View style={{ gap: 8 }}>
+            <Text style={uiStyles.paragraph}>
+              Я подтверждаю, что в моем Google Drive есть свободное место для хранения фотографий сорта. Я разрешаю приложению создать папку Sortoved, папку сорта и папки шагов, а также открыть папку сорта по ссылке для участников работы.
+            </Text>
+            <Button
+              label={driveConsentAccepted ? 'Согласие подтверждено' : 'Подтвердить согласие Drive'}
+              variant={driveConsentAccepted ? 'primary' : 'secondary'}
+              onPress={() => setDriveConsentAccepted((current) => !current)}
+            />
+          </View>
+        ) : null}
+
         <Button
           label={v2Copy.back}
           variant="ghost"
@@ -189,9 +213,10 @@ export function CreationScreen({
         />
         <Button
           label={isLast ? v2Copy.createVariety : v2Copy.next}
-          disabled={!canContinue}
+          disabled={!canContinue || submitting}
           onPress={() => void onNext()}
         />
+        {submitError ? <Text style={[uiStyles.paragraph, { color: '#9E2B25' }]}>{submitError}</Text> : null}
       </Card>
     </Screen>
   );

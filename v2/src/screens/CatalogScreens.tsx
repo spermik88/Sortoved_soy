@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Alert, Text, View } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 
@@ -16,20 +16,32 @@ function getTaskStatusLabel(task: InspectionTask | undefined) {
 export function CatalogScreen({
   navigation,
 }: NativeStackScreenProps<V2RootStackParamList, 'Catalog'>) {
-  const { state } = useV2App();
+  const { state, processQueue } = useV2App();
+
+  useEffect(() => {
+    void processQueue();
+  }, [processQueue]);
 
   return (
     <Screen>
       <Title>{v2Copy.catalogTitle}</Title>
       <Card>
         {state.catalog.length ? (
-          state.catalog.map((variety) => (
-            <Button
-              key={variety.id}
-              label={variety.title}
-              onPress={() => navigation.navigate('Variety', { varietyId: variety.id })}
-            />
-          ))
+          state.catalog.map((variety) => {
+            const pendingCount = state.syncQueue.filter(
+              (item) =>
+                item.varietyId === variety.id &&
+                !item.cloudAppliedAt &&
+                ['queued', 'failed', 'waiting_for_auth', 'synced'].includes(item.status),
+            ).length;
+            return (
+              <Button
+                key={variety.id}
+                label={pendingCount ? `${variety.title} - ожидают отправки: ${pendingCount}` : variety.title}
+                onPress={() => navigation.navigate('Variety', { varietyId: variety.id })}
+              />
+            );
+          })
         ) : (
           <EmptyState title={v2Copy.catalogEmptyTitle} description={v2Copy.catalogEmptyBody} />
         )}
@@ -38,6 +50,7 @@ export function CatalogScreen({
           variant="secondary"
           onPress={() => navigation.navigate('Start')}
         />
+        <Button label="Повторить отправку" variant="secondary" onPress={() => void processQueue()} />
       </Card>
     </Screen>
   );
@@ -47,14 +60,20 @@ export function VarietyScreen({
   route,
   navigation,
 }: NativeStackScreenProps<V2RootStackParamList, 'Variety'>) {
-  const { getVariety, state } = useV2App();
+  const { getVariety, state, refreshTaskReadState } = useV2App();
   const variety = getVariety(route.params.varietyId);
 
   if (!variety) {
     return null;
   }
 
-  const openTask = (taskCode: string) => {
+  const openTask = async (taskCode: string) => {
+    const currentTask = await refreshTaskReadState(variety.id, taskCode);
+    if (currentTask.uiStatus === 'locked_by_google') {
+      Alert.alert(v2Copy.errorTitle, 'Шаг уже заполнен в Google Sheets и открыт только для чтения.');
+      return;
+    }
+
     const taskDef = taskDefinitions.find((item) => item.code === taskCode);
     if (!taskDef) {
       Alert.alert(v2Copy.errorTitle, v2Copy.stepNotFound);
@@ -167,7 +186,7 @@ export function VarietyScreen({
               key={task.code}
               label={`${task.code}. ${task.title} - ${getTaskStatusLabel(draft)}`}
               variant="secondary"
-              onPress={() => openTask(task.code)}
+              onPress={() => void openTask(task.code)}
             />
           );
         })}

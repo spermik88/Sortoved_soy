@@ -1,4 +1,9 @@
-import { SheetWriteOperation, VarietySheetBinding } from '../types/app';
+import { LocalSheetKey, SheetWriteOperation, VarietySheetBinding } from '../types/app';
+import {
+  findMissingTemplateSheets,
+  resolveSheetAliases,
+  SpreadsheetSheetInfo,
+} from './sheetAliasService';
 
 const SHEETS_BASE = 'https://sheets.googleapis.com/v4/spreadsheets';
 
@@ -21,10 +26,25 @@ export function isValidGoogleSheetsUrl(input: string) {
   return /^https:\/\/docs\.google\.com\/spreadsheets\/d\/[a-zA-Z0-9-_]+/i.test(input.trim());
 }
 
+export interface InspectedSpreadsheet extends VarietySheetBinding {
+  title: string;
+  sheets: SpreadsheetSheetInfo[];
+  sheetAliases: Partial<Record<LocalSheetKey, string>>;
+  missingTemplateSheets: string[];
+}
+
 export interface SheetsService {
-  inspectSpreadsheet(accessToken: string, inputUrl: string): Promise<VarietySheetBinding & { title: string }>;
+  inspectSpreadsheet(accessToken: string, inputUrl: string): Promise<InspectedSpreadsheet>;
   createSpreadsheet(accessToken: string, title: string, sheets: string[]): Promise<VarietySheetBinding>;
+  readSheet(accessToken: string, spreadsheetId: string, sheet: string): Promise<(string | number | boolean)[][]>;
+  readRange(accessToken: string, spreadsheetId: string, range: string): Promise<(string | number | boolean)[][]>;
+  batchGet(
+    accessToken: string,
+    spreadsheetId: string,
+    ranges: string[],
+  ): Promise<Record<string, (string | number | boolean)[][]>>;
   writeOperations(accessToken: string, spreadsheetId: string, operations: SheetWriteOperation[]): Promise<void>;
+  batchUpdate(accessToken: string, spreadsheetId: string, requests: Record<string, unknown>[]): Promise<void>;
 }
 
 class GoogleSheetsService implements SheetsService {
@@ -34,17 +54,30 @@ class GoogleSheetsService implements SheetsService {
     }
 
     const spreadsheetId = extractSpreadsheetId(inputUrl);
-    const response = await fetch(`${SHEETS_BASE}/${spreadsheetId}?fields=properties.title`, {
+    const response = await fetch(`${SHEETS_BASE}/${spreadsheetId}?fields=properties.title,sheets.properties`, {
       headers: {
         Authorization: `Bearer ${accessToken}`,
       },
     });
     ensureOk(response);
-    const data = (await response.json()) as { properties?: { title?: string } };
+    const data = (await response.json()) as {
+      properties?: { title?: string };
+      sheets?: { properties?: { sheetId?: number; title?: string } }[];
+    };
+    const sheets = (data.sheets || [])
+      .map((sheet) => ({
+        sheetId: sheet.properties?.sheetId,
+        title: sheet.properties?.title || '',
+      }))
+      .filter((sheet) => sheet.title);
+
     return {
       spreadsheetId,
       spreadsheetUrl: inputUrl,
       title: data.properties?.title || 'Без названия',
+      sheets,
+      sheetAliases: resolveSheetAliases(sheets),
+      missingTemplateSheets: findMissingTemplateSheets(sheets),
     };
   }
 
@@ -71,9 +104,45 @@ class GoogleSheetsService implements SheetsService {
     };
   }
 
+  async readRange(accessToken: string, spreadsheetId: string, range: string) {
+    const response = await fetch(`${SHEETS_BASE}/${spreadsheetId}/values/${encodeURIComponent(range)}`, {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+    });
+    ensureOk(response);
+    const data = (await response.json()) as { values?: (string | number | boolean)[][] };
+    return data.values || [];
+  }
+
+  async readSheet(accessToken: string, spreadsheetId: string, sheet: string) {
+    return this.readRange(accessToken, spreadsheetId, sheet);
+  }
+
+  async batchGet(accessToken: string, spreadsheetId: string, ranges: string[]) {
+    const query = ranges.map((range) => `ranges=${encodeURIComponent(range)}`).join('&');
+    const response = await fetch(`${SHEETS_BASE}/${spreadsheetId}/values:batchGet?${query}`, {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+    });
+    ensureOk(response);
+    const data = (await response.json()) as {
+      valueRanges?: { range?: string; values?: (string | number | boolean)[][] }[];
+    };
+
+    return Object.fromEntries(
+      (data.valueRanges || []).map((item) => [item.range || '', item.values || []]),
+    );
+  }
+
   async writeOperations(accessToken: string, spreadsheetId: string, operations: SheetWriteOperation[]) {
     for (const operation of operations) {
-      if (operation.strategy === 'append' || operation.strategy === 'next-empty' || operation.strategy === 'upload-meta') {
+      if (
+        operation.strategy === 'append' ||
+        operation.strategy === 'next-empty' ||
+        operation.strategy === 'upload-meta'
+      ) {
         const appendRange = encodeURIComponent(operation.range || `${operation.sheet}!A1`);
         const response = await fetch(
           `${SHEETS_BASE}/${spreadsheetId}/values/${appendRange}:append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS`,
@@ -91,7 +160,9 @@ class GoogleSheetsService implements SheetsService {
       }
 
       const response = await fetch(
-        `${SHEETS_BASE}/${spreadsheetId}/values/${encodeURIComponent(operation.range || `${operation.sheet}!A1`)}?valueInputOption=USER_ENTERED`,
+        `${SHEETS_BASE}/${spreadsheetId}/values/${encodeURIComponent(
+          operation.range || `${operation.sheet}!A1`,
+        )}?valueInputOption=USER_ENTERED`,
         {
           method: 'PUT',
           headers: {
@@ -103,6 +174,21 @@ class GoogleSheetsService implements SheetsService {
       );
       ensureOk(response);
     }
+  }
+
+  async batchUpdate(accessToken: string, spreadsheetId: string, requests: Record<string, unknown>[]) {
+    if (!requests.length) {
+      return;
+    }
+    const response = await fetch(`${SHEETS_BASE}/${spreadsheetId}:batchUpdate`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ requests }),
+    });
+    ensureOk(response);
   }
 }
 

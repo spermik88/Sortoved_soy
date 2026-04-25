@@ -1,5 +1,9 @@
 import { LocalSheetKey } from '../types/app';
 
+export const PLOTS_SHEET_NAME = 'делянки';
+export const META_SHEET_NAME = '00.meta';
+export const TEMPLATE_VERSION = '2026-04-24-drive-photo-v1';
+
 const DISEASE_BLOCK_HEADER_ROW = [
   'зараженные делянка 1',
   'фото делянка 1',
@@ -94,13 +98,13 @@ const THOUSAND_SEED_WEIGHT_HEADER_ROW = [
   'мета',
 ] as const;
 
-const PROTEIN_CONTENT_HEADER_ROW = [
-  'РёСЃС‚РѕС‡РЅРёРє РїСЂРѕР±С‹',
-  'РјР°СЃСЃР° РЅР°РІРµСЃРєРё, Рі',
-  'РјРµС‚РѕРґ Р°РЅР°Р»РёР·Р°',
-  'СЃРѕРґРµСЂР¶Р°РЅРёРµ Р±РµР»РєР°, %',
-  'СЃС‚Р°С‚СѓСЃ РЅР°РІРµСЃРєРё',
-  'РјРµС‚Р°',
+const STRUCTURE_HEADER_ROW = [
+  'выборка',
+  'делянка',
+  'номер растения',
+  'значение',
+  'фото',
+  'мета',
 ] as const;
 
 function createDiseaseSheetTemplate() {
@@ -145,21 +149,12 @@ function createThousandSeedWeightSheetTemplate(title: string) {
   )[][];
 }
 
-function createProteinContentSheetTemplate(title: string) {
-  return [[title, '', '', '', '', ''], [...PROTEIN_CONTENT_HEADER_ROW]] as (
-    | string
-    | number
-  )[][];
+function createLabContentSheetTemplate(title: string, contentLabel: string) {
+  return [
+    [title, '', '', '', '', ''],
+    ['источник пробы', 'масса навески, г', 'метод анализа', contentLabel, 'статус навески', 'мета'],
+  ] as (string | number)[][];
 }
-
-const STRUCTURE_HEADER_ROW = [
-  'выборка',
-  'делянка',
-  'номер растения',
-  'значение',
-  'фото',
-  'мета',
-] as const;
 
 function createStructureSheetTemplate(title: string) {
   return [[title, '', '', '', '', ''], [...STRUCTURE_HEADER_ROW]] as (
@@ -168,65 +163,23 @@ function createStructureSheetTemplate(title: string) {
   )[][];
 }
 
-export const SHEET_ALIASES: Record<
-  LocalSheetKey,
-  {
-    local: string;
-    futureRemote: string;
-  }
-> = {
-  fusarium_sheet: {
-    local: 'Лист1',
-    futureRemote: '1.фузариоз',
-  },
-  septoria_sheet: {
-    local: '2.Септориоз',
-    futureRemote: '2.Септориоз',
-  },
-  flea_sheet: {
-    local: '3.Повреждение блошкой',
-    futureRemote: '3.Повреждение блошкой',
-  },
-  bacteriosis_sheet: {
-    local: '6.Бактериоз',
-    futureRemote: '6.Бактериоз',
-  },
-  peronosporosis_sheet: {
-    local: '7.Пероноспороз',
-    futureRemote: '7.Пероноспороз',
-  },
-  cercosporosis_sheet: {
-    local: '8.Церкоспороз',
-    futureRemote: '8.Церкоспороз',
-  },
-  aphid_damage_sheet: {
-    local: '9.Повреждение тлей',
-    futureRemote: '9.Повреждение тлей',
-  },
-  flower_color_sheet: {
-    local: '10.Цветок: окраска',
-    futureRemote: '10.Цветок: окраска',
-  },
-  start_flowering_sheet: {
-    local: '4.Начало цветения',
-    futureRemote: '4.Начало цветения',
-  },
-  full_flowering_sheet: {
-    local: '5.Полное цветение',
-    futureRemote: '5.Полное цветение',
-  },
+export const SHEET_ALIASES: Record<LocalSheetKey, { local: string; futureRemote: string }> = {
+  fusarium_sheet: { local: '1.Фузариоз', futureRemote: '1.Фузариоз' },
+  septoria_sheet: { local: '2.Септориоз', futureRemote: '2.Септориоз' },
+  flea_sheet: { local: '3.Повреждение блошкой', futureRemote: '3.Повреждение блошкой' },
+  start_flowering_sheet: { local: '4.Начало цветения', futureRemote: '4.Начало цветения' },
+  full_flowering_sheet: { local: '5.Полное цветение', futureRemote: '5.Полное цветение' },
+  bacteriosis_sheet: { local: '6.Бактериоз', futureRemote: '6.Бактериоз' },
+  peronosporosis_sheet: { local: '7.Пероноспороз', futureRemote: '7.Пероноспороз' },
+  cercosporosis_sheet: { local: '8.Церкоспороз', futureRemote: '8.Церкоспороз' },
+  aphid_damage_sheet: { local: '9.Повреждение тлей', futureRemote: '9.Повреждение тлей' },
+  flower_color_sheet: { local: '10.Цветок: окраска', futureRemote: '10.Цветок: окраска' },
+  end_flowering_sheet: { local: '11.Конец цветения', futureRemote: '11.Конец цветения' },
   leaf_shape_sheet: {
     local: '12.Лист: форма бокового листочка',
     futureRemote: '12.Лист: форма бокового листочка',
   },
-  end_flowering_sheet: {
-    local: '11.Конец цветения',
-    futureRemote: '11.Конец цветения',
-  },
-  full_maturity_sheet: {
-    local: '13.Полное созревание',
-    futureRemote: '13.Полное созревание',
-  },
+  full_maturity_sheet: { local: '13.Полное созревание', futureRemote: '13.Полное созревание' },
   stem_pubescence_color_sheet: {
     local: '14.Растение: окраска опушения главного стебля',
     futureRemote: '14.Растение: окраска опушения главного стебля',
@@ -239,26 +192,7 @@ export const SHEET_ALIASES: Record<
     local: '16.Устойчивость к осыпанию',
     futureRemote: '16.Устойчивость к осыпанию',
   },
-  yield_per_area_sheet: {
-    local: '26.Урожайность с единицы площади',
-    futureRemote: '26.Урожайность с единицы площади',
-  },
-  thousand_seed_weight_sheet: {
-    local: '27.Масса 1000 семян',
-    futureRemote: '27.Масса 1000 семян',
-  },
-  protein_content_sheet: {
-    local: '28.РЎРѕРґРµСЂР¶Р°РЅРёРµ Р±РµР»РєР°',
-    futureRemote: '28.РЎРѕРґРµСЂР¶Р°РЅРёРµ Р±РµР»РєР°',
-  },
-  fat_content_sheet: {
-    local: '29.РЎРѕРґРµСЂР¶Р°РЅРёРµ Р¶РёСЂР°',
-    futureRemote: '29.РЎРѕРґРµСЂР¶Р°РЅРёРµ Р¶РёСЂР°',
-  },
-  stem_length_sheet: {
-    local: '17.Длина стебля',
-    futureRemote: '17.Длина стебля',
-  },
+  stem_length_sheet: { local: '17.Длина стебля', futureRemote: '17.Длина стебля' },
   lower_pod_attachment_sheet: {
     local: '18.Высота прикрепления нижнего боба',
     futureRemote: '18.Высота прикрепления нижнего боба',
@@ -267,10 +201,7 @@ export const SHEET_ALIASES: Record<
     local: '19.Количество продуктивных узлов на главном стебле',
     futureRemote: '19.Количество продуктивных узлов на главном стебле',
   },
-  branch_count_sheet: {
-    local: '20.Количество ветвей',
-    futureRemote: '20.Количество ветвей',
-  },
+  branch_count_sheet: { local: '20.Количество ветвей', futureRemote: '20.Количество ветвей' },
   productive_pods_sheet: {
     local: '21.Количество продуктивных бобов',
     futureRemote: '21.Количество продуктивных бобов',
@@ -291,10 +222,31 @@ export const SHEET_ALIASES: Record<
     local: '25.Масса семян с растения',
     futureRemote: '25.Масса семян с растения',
   },
+  yield_per_area_sheet: {
+    local: '26.Урожайность с единицы площади',
+    futureRemote: '26.Урожайность с единицы площади',
+  },
+  thousand_seed_weight_sheet: {
+    local: '27.Масса 1000 семян',
+    futureRemote: '27.Масса 1000 семян',
+  },
+  protein_content_sheet: { local: '28.Содержание белка', futureRemote: '28.Содержание белка' },
+  fat_content_sheet: { local: '29.Содержание жира', futureRemote: '29.Содержание жира' },
 };
 
 export const TEMPLATE_SHEETS: Record<string, (string | number)[][]> = {
-  делянки: [
+  [META_SHEET_NAME]: [
+    ['key', 'value'],
+    ['templateVersion', TEMPLATE_VERSION],
+    ['creatorEmail', ''],
+    ['rootFolderId', ''],
+    ['rootFolderUrl', ''],
+    ['varietyFolderId', ''],
+    ['varietyFolderUrl', ''],
+    [],
+    ['sheetName', 'folderId', 'folderUrl'],
+  ],
+  [PLOTS_SHEET_NAME]: [
     [
       'делянки',
       'дата создания',
@@ -315,43 +267,21 @@ export const TEMPLATE_SHEETS: Record<string, (string | number)[][]> = {
   [SHEET_ALIASES.fusarium_sheet.local]: createDiseaseSheetTemplate(),
   [SHEET_ALIASES.septoria_sheet.local]: createDiseaseSheetTemplate(),
   [SHEET_ALIASES.flea_sheet.local]: createDiseaseSheetTemplate(),
+  [SHEET_ALIASES.start_flowering_sheet.local]: createPhenologySheetTemplate('4. Начало цветения'),
+  [SHEET_ALIASES.full_flowering_sheet.local]: createPhenologySheetTemplate('5. Полное цветение'),
   [SHEET_ALIASES.bacteriosis_sheet.local]: createDiseaseSheetTemplate(),
   [SHEET_ALIASES.peronosporosis_sheet.local]: createDiseaseSheetTemplate(),
   [SHEET_ALIASES.cercosporosis_sheet.local]: createDiseaseSheetTemplate(),
   [SHEET_ALIASES.aphid_damage_sheet.local]: createDiseaseSheetTemplate(),
-  [SHEET_ALIASES.flower_color_sheet.local]: createChoiceSheetTemplate(
-    '10. Цветок: окраска',
-  ),
-  [SHEET_ALIASES.start_flowering_sheet.local]: createPhenologySheetTemplate(
-    '4. Начало цветения',
-  ),
-  [SHEET_ALIASES.full_flowering_sheet.local]: createPhenologySheetTemplate(
-    '5. Полное цветение',
-  ),
-  [SHEET_ALIASES.leaf_shape_sheet.local]: createChoiceSheetTemplate(
-    '12. Лист: форма бокового листочка',
-  ),
-  [SHEET_ALIASES.end_flowering_sheet.local]: createPhenologySheetTemplate(
-    '11. Конец цветения',
-  ),
-  [SHEET_ALIASES.full_maturity_sheet.local]: createPhenologySheetTemplate(
-    '13. Полное созревание',
-  ),
+  [SHEET_ALIASES.flower_color_sheet.local]: createChoiceSheetTemplate('10. Цветок: окраска'),
+  [SHEET_ALIASES.end_flowering_sheet.local]: createPhenologySheetTemplate('11. Конец цветения'),
+  [SHEET_ALIASES.leaf_shape_sheet.local]: createChoiceSheetTemplate('12. Лист: форма бокового листочка'),
+  [SHEET_ALIASES.full_maturity_sheet.local]: createPhenologySheetTemplate('13. Полное созревание'),
   [SHEET_ALIASES.stem_pubescence_color_sheet.local]: createChoiceSheetTemplate(
     '14. Растение: окраска опушения главного стебля',
   ),
-  [SHEET_ALIASES.lodging_resistance_sheet.local]: createScoreSheetTemplate(
-    '15. Устойчивость к полеганию',
-  ),
-  [SHEET_ALIASES.shattering_resistance_sheet.local]: createScoreSheetTemplate(
-    '16. Устойчивость к осыпанию',
-  ),
-  [SHEET_ALIASES.yield_per_area_sheet.local]: createYieldSheetTemplate(
-    '26. Урожайность с единицы площади',
-  ),
-  [SHEET_ALIASES.thousand_seed_weight_sheet.local]: createThousandSeedWeightSheetTemplate(
-    '27. Масса 1000 семян',
-  ),
+  [SHEET_ALIASES.lodging_resistance_sheet.local]: createScoreSheetTemplate('15. Устойчивость к полеганию'),
+  [SHEET_ALIASES.shattering_resistance_sheet.local]: createScoreSheetTemplate('16. Устойчивость к осыпанию'),
   [SHEET_ALIASES.stem_length_sheet.local]: createStructureSheetTemplate('17. Длина стебля'),
   [SHEET_ALIASES.lower_pod_attachment_sheet.local]: createStructureSheetTemplate(
     '18. Высота прикрепления нижнего боба',
@@ -359,9 +289,7 @@ export const TEMPLATE_SHEETS: Record<string, (string | number)[][]> = {
   [SHEET_ALIASES.productive_nodes_sheet.local]: createStructureSheetTemplate(
     '19. Количество продуктивных узлов на главном стебле',
   ),
-  [SHEET_ALIASES.branch_count_sheet.local]: createStructureSheetTemplate(
-    '20. Количество ветвей',
-  ),
+  [SHEET_ALIASES.branch_count_sheet.local]: createStructureSheetTemplate('20. Количество ветвей'),
   [SHEET_ALIASES.productive_pods_sheet.local]: createStructureSheetTemplate(
     '21. Количество продуктивных бобов',
   ),
@@ -371,28 +299,32 @@ export const TEMPLATE_SHEETS: Record<string, (string | number)[][]> = {
   [SHEET_ALIASES.seeds_per_plant_sheet.local]: createStructureSheetTemplate(
     '23. Количество семян с растения',
   ),
-  [SHEET_ALIASES.seeds_per_pod_sheet.local]: createStructureSheetTemplate(
-    '24. Количество семян в бобе',
-  ),
+  [SHEET_ALIASES.seeds_per_pod_sheet.local]: createStructureSheetTemplate('24. Количество семян в бобе'),
   [SHEET_ALIASES.seed_weight_per_plant_sheet.local]: createStructureSheetTemplate(
     '25. Масса семян с растения',
   ),
+  [SHEET_ALIASES.yield_per_area_sheet.local]: createYieldSheetTemplate('26. Урожайность с единицы площади'),
+  [SHEET_ALIASES.thousand_seed_weight_sheet.local]: createThousandSeedWeightSheetTemplate('27. Масса 1000 семян'),
+  [SHEET_ALIASES.protein_content_sheet.local]: createLabContentSheetTemplate(
+    '28. Содержание белка',
+    'содержание белка, %',
+  ),
+  [SHEET_ALIASES.fat_content_sheet.local]: createLabContentSheetTemplate(
+    '29. Содержание жира',
+    'содержание жира, %',
+  ),
 };
 
-export const GENERIC_TRAIT_HEADERS = [['значение', 'фото', 'мета', 'делянка']];
-
-export const EMPTY_TRAIT_SHEETS = [
-  '17.Длина стебля',
-  '18.Высота прикрепления нижнего боба',
-  '19.Количество продуктивных узлов на главном стебле',
-  '20.Количество ветвей',
-  '21.Количество продуктивных бобов',
-  '22.Количество бобов на продуктивный узел',
-  '23.Количество семян с растения',
-  '24.Количество семян в бобе',
-  '25.Масса семян с растения',
-  '26.Урожайность с единицы площади',
-  '27.Масса 1000 семян',
-  '28.Содержание белка',
-  '29.Содержание жира',
+export const TEMPLATE_WORKSHEET_NAMES = [
+  META_SHEET_NAME,
+  PLOTS_SHEET_NAME,
+  ...Object.values(SHEET_ALIASES).map((entry) => entry.futureRemote),
 ];
+
+export const PHOTO_FOLDER_SHEET_NAMES = [
+  PLOTS_SHEET_NAME,
+  ...Object.values(SHEET_ALIASES).map((entry) => entry.futureRemote),
+];
+
+export const GENERIC_TRAIT_HEADERS = [['значение', 'фото', 'мета', 'делянка']];
+export const EMPTY_TRAIT_SHEETS: string[] = [];
