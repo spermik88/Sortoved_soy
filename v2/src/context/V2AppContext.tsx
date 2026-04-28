@@ -17,7 +17,7 @@ import {
   TEMPLATE_WORKSHEET_NAMES,
 } from '../config/templateSchema';
 import { v2Repository } from '../repositories/v2Repository';
-import { authService } from '../services/authService';
+import { authService, assertGoogleSessionUsable, isGoogleSessionUsable } from '../services/authService';
 import { clipboardService } from '../services/clipboardService';
 import { driveService } from '../services/driveService';
 import { syncTaskReadState } from '../services/googleSyncService';
@@ -922,11 +922,16 @@ export function V2AppProvider({ children }: { children: ReactNode }) {
       const isOnline = onlineResult.status === 'fulfilled' ? onlineResult.value : true;
       const restoredSession = sessionResult.status === 'fulfilled' ? sessionResult.value : null;
       const nextState = stored ? normalizeState(stored) : initialState;
+      const nextSession = isGoogleSessionUsable(restoredSession)
+        ? restoredSession
+        : isGoogleSessionUsable(nextState.session)
+          ? nextState.session
+          : null;
 
       setOnline(isOnline);
       setState({
         ...nextState,
-        session: restoredSession || nextState.session,
+        session: nextSession,
       });
       setHydrated(true);
     }
@@ -2211,10 +2216,7 @@ export function V2AppProvider({ children }: { children: ReactNode }) {
 
         const now = new Date().toISOString();
         const varietyId = createId('variety');
-        const session = stateRef.current.session;
-        if (!session?.accessToken) {
-          throw new Error('Сначала выполните авторизацию Google');
-        }
+        const session = assertGoogleSessionUsable(stateRef.current.session);
         const inspected = await sheetsService.inspectSpreadsheet(session.accessToken, raw);
         if (inspected.missingTemplateSheets.length) {
           throw new Error(
@@ -2319,12 +2321,9 @@ export function V2AppProvider({ children }: { children: ReactNode }) {
       async completeCreation() {
         console.log('[Creation] completeCreation:start');
         const draft = stateRef.current.creationDraft;
-        const session = stateRef.current.session;
+        const session = assertGoogleSessionUsable(stateRef.current.session);
         if (!draft) {
           throw new Error(v2Copy.creationDraftMissing);
-        }
-        if (!session?.accessToken) {
-          throw new Error('Сначала выполните авторизацию Google');
         }
 
         const title = normalizeTitle(draft.varietyName);
@@ -2443,10 +2442,10 @@ export function V2AppProvider({ children }: { children: ReactNode }) {
       async refreshTaskReadState(varietyId, taskCode) {
         const variety = stateRef.current.catalog.find((item) => item.id === varietyId);
         const task = getTaskInternal(varietyId, taskCode);
-        const session = stateRef.current.session;
-        if (!variety || !session?.accessToken) {
+        if (!variety || !isGoogleSessionUsable(stateRef.current.session)) {
           return task;
         }
+        const session = assertGoogleSessionUsable(stateRef.current.session);
 
         const syncedTask = await syncTaskReadState(session.accessToken, variety, task);
         if (syncedTask !== task) {

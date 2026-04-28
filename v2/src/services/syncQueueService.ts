@@ -109,6 +109,7 @@ export async function processQueuedOperation(
       variety.binding.spreadsheetId,
       prepareWrites(variety, { ...operation, media: [] }),
     );
+    operation.writes = [];
   }
 
   if (operation.media?.length) {
@@ -166,7 +167,7 @@ export async function processQueuedOperation(
     }
   }
 
-  if (operation.writes?.length) {
+  if (operation.type !== 'create_variety' && operation.writes?.length) {
     await sheetsService.writeOperations(
       deps.session.accessToken,
       variety.binding.spreadsheetId,

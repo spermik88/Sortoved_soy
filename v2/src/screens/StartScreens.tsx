@@ -10,7 +10,7 @@ import { googleConfig } from '../config/google';
 import { v2Copy } from '../config/copy';
 import { useV2App } from '../context/V2AppContext';
 import { V2RootStackParamList } from '../navigation/types';
-import { buildGoogleSession } from '../services/authService';
+import { buildGoogleSession, isGoogleSessionUsable } from '../services/authService';
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -31,11 +31,27 @@ function buildExpoProxyGoogleAuthUrl(authUrl: string, webClientId: string) {
   return url.toString();
 }
 
+function parseAuthenticationFromUrl(url: string): Parameters<typeof buildGoogleSession>[0] {
+  const parsed = new URL(url);
+  const params = new URLSearchParams(parsed.search);
+  if (parsed.hash) {
+    const hashParams = new URLSearchParams(parsed.hash.replace(/^#/, ''));
+    hashParams.forEach((value, key) => params.set(key, value));
+  }
+
+  return {
+    accessToken: params.get('access_token'),
+    refreshToken: params.get('refresh_token'),
+    expiresIn: params.get('expires_in') ? Number(params.get('expires_in')) : undefined,
+    issuedAt: Math.floor(Date.now() / 1000),
+  };
+}
+
 export function StartScreen({
   navigation,
 }: NativeStackScreenProps<V2RootStackParamList, 'Start'>) {
   const { state, signOut, beginCreation } = useV2App();
-  const hasSession = Boolean(state.session?.accessToken);
+  const hasSession = isGoogleSessionUsable(state.session);
 
   return (
     <Screen>
@@ -88,7 +104,6 @@ export function AuthScreen({
   navigation,
 }: NativeStackScreenProps<V2RootStackParamList, 'Auth'>) {
   const { state, prepareMode, importVarietyFromClipboard, beginCreation } = useV2App();
-  const [authRequested, setAuthRequested] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [request, response, promptAsync] = Google.useAuthRequest({
     clientId: USE_EXPO_PROXY ? process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID : undefined,
@@ -136,6 +151,11 @@ export function AuthScreen({
       return;
     }
 
+    if (route.params.mode === 'resumeCreation') {
+      navigation.replace('CreationCloudSync');
+      return;
+    }
+
     await importVarietyFromClipboard();
     navigation.reset({
       index: 0,
@@ -145,12 +165,11 @@ export function AuthScreen({
 
   const proceed = async () => {
     try {
-      if (!state.session?.accessToken) {
+      const shouldAuthorize = Boolean(route.params.force) || !isGoogleSessionUsable(state.session);
+      if (shouldAuthorize) {
         if (!process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID || !process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID) {
           throw new Error('Google OAuth не настроен. Заполните EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID и EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID.');
         }
-
-        setAuthRequested(true);
         setSubmitting(true);
 
         const webClientId = process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID;
@@ -160,17 +179,26 @@ export function AuthScreen({
         const proxyStartUrl = proxyAuthUrl && request?.redirectUri
           ? buildExpoProxyStartUrl(proxyAuthUrl, request.redirectUri)
           : undefined;
+        console.log('[Auth] start', {
+          mode: route.params.mode,
+          redirectUri: request?.redirectUri,
+          proxyStartUrl,
+        });
+        if (!proxyStartUrl || !request?.redirectUri) {
+          throw new Error('Google OAuth request is not ready. Попробуйте нажать еще раз.');
+        }
 
-        const result = await promptAsync({
-          useProxy: true,
-          url: proxyStartUrl,
-        } as Parameters<typeof promptAsync>[0] & { useProxy: true });
+        const result = USE_EXPO_PROXY
+          ? await WebBrowser.openAuthSessionAsync(proxyStartUrl, request.redirectUri)
+          : await promptAsync({ useProxy: true } as Parameters<typeof promptAsync>[0] & { useProxy: true });
+        console.log('[Auth] result', result);
         if (result.type !== 'success') {
-          setAuthRequested(false);
           throw new Error('Авторизация отменена или не завершена');
         }
 
-        const authentication = result.authentication;
+        const authentication = 'authentication' in result
+          ? result.authentication
+          : parseAuthenticationFromUrl(result.url);
 
         await finishAuthorizedFlow(authentication as Parameters<typeof buildGoogleSession>[0]);
         return;
@@ -192,7 +220,6 @@ export function AuthScreen({
       }
 
     } catch (error) {
-      setAuthRequested(false);
       setSubmitting(false);
       Alert.alert(
         v2Copy.errorTitle,

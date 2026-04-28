@@ -40,7 +40,7 @@ import { formatPhotoMeta } from '../utils/format';
 type Workbook = Record<string, (string | number | boolean)[][]>;
 type Plot = '1' | '2' | '3';
 
-const DATA_START_ROW_INDEX = 2;
+const DATA_START_ROW_INDEX = 1;
 const PHOTO_PENDING_UPLOAD = 'photo_pending_upload';
 const THOUSAND_SEED_WEIGHT_TOLERANCE_TABLE = [
   [0, 0.02, 0.03, 0.04, 0.06, 0.08, 0.09, 0.1, 0.12, 0.14],
@@ -90,9 +90,9 @@ export function resolvePhenologyBlockColumns(plot: Plot) {
     return { confirmation: 0, photo: 1, meta: 2 };
   }
   if (plot === '2') {
-    return { confirmation: 4, photo: 5, meta: 6 };
+    return { confirmation: 3, photo: 4, meta: 5 };
   }
-  return { confirmation: 8, photo: 9, meta: 10 };
+  return { confirmation: 6, photo: 7, meta: 8 };
 }
 
 export function resolveChoiceBlockColumns(plot: Plot) {
@@ -100,9 +100,9 @@ export function resolveChoiceBlockColumns(plot: Plot) {
     return { value: 0, photo: 1, meta: 2 };
   }
   if (plot === '2') {
-    return { value: 4, photo: 5, meta: 6 };
+    return { value: 3, photo: 4, meta: 5 };
   }
-  return { value: 8, photo: 9, meta: 10 };
+  return { value: 6, photo: 7, meta: 8 };
 }
 
 export function resolveScoreBlockColumns(plot: Plot) {
@@ -110,9 +110,9 @@ export function resolveScoreBlockColumns(plot: Plot) {
     return { value: 0, photo: 1, meta: 2 };
   }
   if (plot === '2') {
-    return { value: 4, photo: 5, meta: 6 };
+    return { value: 3, photo: 4, meta: 5 };
   }
-  return { value: 8, photo: 9, meta: 10 };
+  return { value: 6, photo: 7, meta: 8 };
 }
 
 export function resolveYieldBlockColumns(plot: Plot) {

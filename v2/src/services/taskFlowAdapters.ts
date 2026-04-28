@@ -13,7 +13,7 @@ function hasAnyMeaningfulValue(cells: GoogleSheetRow, indexes: number[]) {
 }
 
 function firstDataRow(values: GoogleSheetRow[] | undefined) {
-  return values?.[2] || [];
+  return values?.[1] || [];
 }
 
 export interface TaskFlowAdapter {
@@ -44,7 +44,7 @@ function buildFixedDataRowOperation(
   aliases?: Partial<Record<LocalSheetKey, string>>,
 ): SheetWriteOperation[] {
   const sheet = resolveSheetTitle(logicalSheetKey, aliases);
-  return [{ strategy: 'replace', sheet, range: `${sheet}!A3`, values }];
+  return [{ strategy: 'replace', sheet, range: `${sheet}!A2`, values }];
 }
 
 function buildAppendOperation(
@@ -53,7 +53,7 @@ function buildAppendOperation(
   aliases?: Partial<Record<LocalSheetKey, string>>,
 ): SheetWriteOperation[] {
   const sheet = resolveSheetTitle(logicalSheetKey, aliases);
-  return values.length ? [{ strategy: 'append', sheet, range: `${sheet}!A3`, values }] : [];
+  return values.length ? [{ strategy: 'append', sheet, range: `${sheet}!A2`, values }] : [];
 }
 
 function makeAdapter(
@@ -79,10 +79,10 @@ function makeAdapter(
       }
 
       if (payload?.kind === 'structure_sampling_step') {
-        return buildAppendOperation(logicalSheetKey, (localValues || []).slice(2), aliases);
+        return buildAppendOperation(logicalSheetKey, (localValues || []).slice(1), aliases);
       }
 
-      return buildFixedDataRowOperation(logicalSheetKey, localValues?.[2] ? [localValues[2]] : [], aliases);
+      return buildFixedDataRowOperation(logicalSheetKey, localValues?.[1] ? [localValues[1]] : [], aliases);
     },
   };
 }

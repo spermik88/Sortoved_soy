@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Alert, Text, View } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 
@@ -35,8 +35,13 @@ export function CreationScreen({
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
+  useEffect(() => {
+    if (!draft) {
+      navigation.replace('Start');
+    }
+  }, [draft, navigation]);
+
   if (!draft) {
-    navigation.replace('Start');
     return null;
   }
 

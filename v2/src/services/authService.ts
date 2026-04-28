@@ -12,6 +12,36 @@ export type GoogleAuthenticationResult = {
   issuedAt?: number | null;
 };
 
+const TOKEN_EXPIRY_SKEW_MS = 5 * 60 * 1000;
+
+function toEpochMs(value: number) {
+  return value < 1000000000000 ? value * 1000 : value;
+}
+
+export function isGoogleSessionExpired(session: GoogleSession | null | undefined) {
+  if (!session?.accessToken) {
+    return true;
+  }
+
+  if (!session.expiresAt) {
+    return true;
+  }
+
+  return toEpochMs(session.expiresAt) <= Date.now() + TOKEN_EXPIRY_SKEW_MS;
+}
+
+export function isGoogleSessionUsable(session: GoogleSession | null | undefined) {
+  return Boolean(session?.accessToken && !isGoogleSessionExpired(session));
+}
+
+export function assertGoogleSessionUsable(session: GoogleSession | null | undefined) {
+  if (!isGoogleSessionUsable(session)) {
+    throw new Error('Сначала выполните авторизацию Google');
+  }
+
+  return session as GoogleSession;
+}
+
 async function fetchGoogleEmail(accessToken: string) {
   const userInfoResponse = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
     headers: {
@@ -25,6 +55,19 @@ async function fetchGoogleEmail(accessToken: string) {
 
   const userInfo = (await userInfoResponse.json()) as { email?: string };
   return userInfo.email;
+}
+
+async function isAccessTokenAccepted(accessToken: string) {
+  try {
+    const userInfoResponse = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+    });
+    return userInfoResponse.ok;
+  } catch {
+    return false;
+  }
 }
 
 export async function buildGoogleSession(
@@ -53,7 +96,17 @@ export interface AuthService {
 class GoogleAuthService implements AuthService {
   async restoreSession() {
     const raw = await SecureStore.getItemAsync(STORAGE_KEY);
-    return raw ? (JSON.parse(raw) as GoogleSession) : null;
+    if (!raw) {
+      return null;
+    }
+
+    const session = JSON.parse(raw) as GoogleSession;
+    if (!isGoogleSessionUsable(session) || !(await isAccessTokenAccepted(session.accessToken))) {
+      await this.persistSession(null);
+      return null;
+    }
+
+    return session;
   }
 
   async persistSession(session: GoogleSession | null) {

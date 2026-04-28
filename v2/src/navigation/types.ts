@@ -1,6 +1,6 @@
 export type V2RootStackParamList = {
   Start: undefined;
-  Auth: { mode: 'link' | 'create' };
+  Auth: { mode: 'link' | 'create' | 'resumeCreation'; force?: boolean };
   Catalog: undefined;
   Creation: undefined;
   CreationCloudSync: undefined;

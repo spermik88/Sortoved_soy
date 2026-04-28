@@ -6,6 +6,7 @@ import { Button, Card, Screen, Title, uiStyles } from '../components/Ui';
 import { colors } from '../constants/theme';
 import { useV2App } from '../context/V2AppContext';
 import { V2RootStackParamList } from '../navigation/types';
+import { isGoogleSessionUsable } from '../services/authService';
 
 const steps = [
   'Создаем папки в Google Drive',
@@ -18,7 +19,7 @@ const steps = [
 export function CreationCloudSyncScreen({
   navigation,
 }: NativeStackScreenProps<V2RootStackParamList, 'CreationCloudSync'>) {
-  const { completeCreation } = useV2App();
+  const { completeCreation, state } = useV2App();
   const startedRef = useRef(false);
   const [error, setError] = useState<string | null>(null);
   const [stepIndex, setStepIndex] = useState(0);
@@ -35,13 +36,22 @@ export function CreationCloudSyncScreen({
 
     async function run() {
       try {
+        if (!isGoogleSessionUsable(state.session)) {
+          navigation.replace('Auth', { mode: 'resumeCreation' });
+          return;
+        }
         await completeCreation();
         navigation.reset({
           index: 0,
           routes: [{ name: 'Catalog' }],
         });
       } catch (caught) {
-        setError(caught instanceof Error ? caught.message : 'Не удалось создать сорт в облаке.');
+        const message = caught instanceof Error ? caught.message : 'Cloud creation failed.';
+        if (/401|UNAUTHENTICATED|Invalid Credentials|authError/i.test(message)) {
+          navigation.replace('Auth', { mode: 'resumeCreation', force: true });
+          return;
+        }
+        setError(message);
       } finally {
         clearInterval(interval);
       }
@@ -50,7 +60,7 @@ export function CreationCloudSyncScreen({
     void run();
 
     return () => clearInterval(interval);
-  }, [completeCreation, navigation]);
+  }, [completeCreation, navigation, state.session]);
 
   return (
     <Screen scroll={false}>

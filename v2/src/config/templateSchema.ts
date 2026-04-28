@@ -2,165 +2,142 @@ import { LocalSheetKey } from '../types/app';
 
 export const PLOTS_SHEET_NAME = 'делянки';
 export const META_SHEET_NAME = '00.meta';
-export const TEMPLATE_VERSION = '2026-04-24-drive-photo-v1';
+export const TEMPLATE_VERSION = '2026-04-28-new-sample-v2';
 
 const DISEASE_BLOCK_HEADER_ROW = [
-  'зараженные делянка 1',
-  'фото делянка 1',
-  'мета делянка 1',
-  'зараженных на делянке 1',
-  'итого, % заболевших делянка 1',
-  'зараженные делянка 2',
-  'фото делянка 2',
-  'мета делянка 2',
-  'зараженных на делянке 2',
-  'итого, % заболевших делянка 2',
-  'зараженные делянка 3',
-  'фото делянка 3',
-  'мета делянка 3',
-  'зараженных на делянке 3',
-  'итого, % заболевших делянка 3',
+  "зараженные делянка 1",
+  "фото делянка 1",
+  "мета делянка 1",
+  "зараженных на делянке 1",
+  "итого, % заболевших делянка 1",
+  "зараженные делянка 2",
+  "фото делянка 2",
+  "мета делянка 2",
+  "зараженных на делянке 2",
+  "итого, % заболевших делянка 2",
+  "зараженные делянка 3",
+  "фото делянка 3",
+  "мета делянка 3",
+  "зараженных на делянке 3",
+  "итого, % заболевших делянка 3",
 ] as const;
 
 const PHENOLOGY_BLOCK_HEADER_ROW = [
-  'подтверждение делянка 1',
-  'фото делянка 1',
-  'мета делянка 1',
-  '',
-  'подтверждение делянка 2',
-  'фото делянка 2',
-  'мета делянка 2',
-  '',
-  'подтверждение делянка 3',
-  'фото делянка 3',
-  'мета делянка 3',
+  "подтверждение делянка 1",
+  "фото делянка 1",
+  "мета делянка 1",
+  "подтверждение делянка 2",
+  "фото делянка 2",
+  "мета делянка 2",
+  "подтверждение делянка 3",
+  "фото делянка 3",
+  "мета делянка 3",
 ] as const;
 
 const CHOICE_BLOCK_HEADER_ROW = [
-  'значение делянка 1',
-  'фото делянка 1',
-  'мета делянка 1',
-  '',
-  'значение делянка 2',
-  'фото делянка 2',
-  'мета делянка 2',
-  '',
-  'значение делянка 3',
-  'фото делянка 3',
-  'мета делянка 3',
+  "значение делянка 1",
+  "фото делянка 1",
+  "мета делянка 1",
+  "значение делянка 2",
+  "фото делянка 2",
+  "мета делянка 2",
+  "значение делянка 3",
+  "фото делянка 3",
+  "мета делянка 3",
 ] as const;
 
 const SCORE_BLOCK_HEADER_ROW = [
-  'оценка делянка 1',
-  'фото делянка 1',
-  'мета делянка 1',
-  '',
-  'оценка делянка 2',
-  'фото делянка 2',
-  'мета делянка 2',
-  '',
-  'оценка делянка 3',
-  'фото делянка 3',
-  'мета делянка 3',
+  "оценка делянка 1",
+  "фото делянка 1",
+  "мета делянка 1",
+  "оценка делянка 2",
+  "фото делянка 2",
+  "мета делянка 2",
+  "оценка делянка 3",
+  "фото делянка 3",
+  "мета делянка 3",
 ] as const;
 
 const YIELD_BLOCK_HEADER_ROW = [
-  'масса сырого зерна делянка 1',
-  'влажность делянка 1',
-  'площадь делянка 1',
-  'урожайность делянка 1',
-  'мета делянка 1',
-  '',
-  'масса сырого зерна делянка 2',
-  'влажность делянка 2',
-  'площадь делянка 2',
-  'урожайность делянка 2',
-  'мета делянка 2',
-  '',
-  'масса сырого зерна делянка 3',
-  'влажность делянка 3',
-  'площадь делянка 3',
-  'урожайность делянка 3',
-  'мета делянка 3',
+  "масса сырого зерна делянка 1",
+  "влажность делянка 1",
+  "площадь делянка 1",
+  "урожайность делянка 1",
+  "мета делянка 1",
+  "",
+  "масса сырого зерна делянка 2",
+  "влажность делянка 2",
+  "площадь делянка 2",
+  "урожайность делянка 2",
+  "мета делянка 2",
+  "",
+  "масса сырого зерна делянка 3",
+  "влажность делянка 3",
+  "площадь делянка 3",
+  "урожайность делянка 3",
+  "мета делянка 3",
 ] as const;
 
 const THOUSAND_SEED_WEIGHT_HEADER_ROW = [
-  'источник пробы',
-  'масса пробы 1, г',
-  'масса пробы 2, г',
-  'масса пробы 3, г',
-  'выбранная пара',
-  'суммарная масса пары, г',
-  'фактическое расхождение, г',
-  'допустимое расхождение, г',
-  'масса 1000 семян, г',
-  'статус анализа',
-  'мета',
+  "источник пробы",
+  "масса пробы 1, г",
+  "масса пробы 2, г",
+  "масса пробы 3, г",
+  "выбранная пара",
+  "суммарная масса пары, г",
+  "фактическое расхождение, г",
+  "допустимое расхождение, г",
+  "масса 1000 семян, г",
+  "статус анализа",
+  "мета",
 ] as const;
 
 const STRUCTURE_HEADER_ROW = [
-  'выборка',
-  'делянка',
-  'номер растения',
-  'значение',
-  'фото',
-  'мета',
+  "выборка",
+  "делянка",
+  "номер растения",
+  "значение",
+  "фото",
+  "мета",
 ] as const;
 
 function createDiseaseSheetTemplate() {
-  return [
-    [1, '', '', '', '', 2, '', '', '', '', 3, '', '', '', ''],
-    [...DISEASE_BLOCK_HEADER_ROW],
-  ] as (string | number)[][];
+  return [[...DISEASE_BLOCK_HEADER_ROW]] as (string | number)[][];
 }
 
-function createPhenologySheetTemplate(title: string) {
-  return [[title, '', '', '', '', '', '', '', '', '', ''], [...PHENOLOGY_BLOCK_HEADER_ROW]] as (
-    | string
-    | number
-  )[][];
+function createPhenologySheetTemplate(_title: string) {
+  return [[...PHENOLOGY_BLOCK_HEADER_ROW]] as (string | number)[][];
 }
 
-function createChoiceSheetTemplate(title: string) {
-  return [[title, '', '', '', '', '', '', '', '', '', ''], [...CHOICE_BLOCK_HEADER_ROW]] as (
-    | string
-    | number
-  )[][];
+function createChoiceSheetTemplate(_title: string) {
+  return [[...CHOICE_BLOCK_HEADER_ROW]] as (string | number)[][];
 }
 
-function createScoreSheetTemplate(title: string) {
-  return [[title, '', '', '', '', '', '', '', '', '', ''], [...SCORE_BLOCK_HEADER_ROW]] as (
-    | string
-    | number
-  )[][];
+function createScoreSheetTemplate(_title: string) {
+  return [[...SCORE_BLOCK_HEADER_ROW]] as (string | number)[][];
 }
 
-function createYieldSheetTemplate(title: string) {
-  return [[title, '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', ''], [...YIELD_BLOCK_HEADER_ROW]] as (
-    | string
-    | number
-  )[][];
+function createYieldSheetTemplate(_title: string) {
+  return [[...YIELD_BLOCK_HEADER_ROW]] as (string | number)[][];
 }
 
-function createThousandSeedWeightSheetTemplate(title: string) {
-  return [[title, '', '', '', '', '', '', '', '', '', ''], [...THOUSAND_SEED_WEIGHT_HEADER_ROW]] as (
-    | string
-    | number
-  )[][];
+function createThousandSeedWeightSheetTemplate(_title: string) {
+  return [[...THOUSAND_SEED_WEIGHT_HEADER_ROW]] as (string | number)[][];
 }
 
-function createLabContentSheetTemplate(title: string, contentLabel: string) {
-  return [
-    [title, '', '', '', '', ''],
-    ['источник пробы', 'масса навески, г', 'метод анализа', contentLabel, 'статус навески', 'мета'],
-  ] as (string | number)[][];
+function createLabContentSheetTemplate(_title: string, contentLabel: string) {
+  return [[
+    "источник пробы",
+    "масса навески, г",
+    "метод анализа",
+    contentLabel,
+    "статус навески",
+    "мета",
+  ]] as (string | number)[][];
 }
 
-function createStructureSheetTemplate(title: string) {
-  return [[title, '', '', '', '', ''], [...STRUCTURE_HEADER_ROW]] as (
-    | string
-    | number
-  )[][];
+function createStructureSheetTemplate(_title: string) {
+  return [[...STRUCTURE_HEADER_ROW]] as (string | number)[][];
 }
 
 export const SHEET_ALIASES: Record<LocalSheetKey, { local: string; futureRemote: string }> = {
@@ -173,16 +150,16 @@ export const SHEET_ALIASES: Record<LocalSheetKey, { local: string; futureRemote:
   peronosporosis_sheet: { local: '7.Пероноспороз', futureRemote: '7.Пероноспороз' },
   cercosporosis_sheet: { local: '8.Церкоспороз', futureRemote: '8.Церкоспороз' },
   aphid_damage_sheet: { local: '9.Повреждение тлей', futureRemote: '9.Повреждение тлей' },
-  flower_color_sheet: { local: '10.Цветок: окраска', futureRemote: '10.Цветок: окраска' },
+  flower_color_sheet: { local: '10.Цветок окраска', futureRemote: '10.Цветок окраска' },
   end_flowering_sheet: { local: '11.Конец цветения', futureRemote: '11.Конец цветения' },
   leaf_shape_sheet: {
-    local: '12.Лист: форма бокового листочка',
-    futureRemote: '12.Лист: форма бокового листочка',
+    local: '12.Лист форма бокового листочка',
+    futureRemote: '12.Лист форма бокового листочка',
   },
   full_maturity_sheet: { local: '13.Полное созревание', futureRemote: '13.Полное созревание' },
   stem_pubescence_color_sheet: {
-    local: '14.Растение: окраска опушения главного стебля',
-    futureRemote: '14.Растение: окраска опушения главного стебля',
+    local: '14.Растение окраска опушения гл',
+    futureRemote: '14.Растение окраска опушения гл',
   },
   lodging_resistance_sheet: {
     local: '15.Устойчивость к полеганию',
@@ -194,21 +171,21 @@ export const SHEET_ALIASES: Record<LocalSheetKey, { local: string; futureRemote:
   },
   stem_length_sheet: { local: '17.Длина стебля', futureRemote: '17.Длина стебля' },
   lower_pod_attachment_sheet: {
-    local: '18.Высота прикрепления нижнего боба',
-    futureRemote: '18.Высота прикрепления нижнего боба',
+    local: '18.Высота прикрепления нижнего ',
+    futureRemote: '18.Высота прикрепления нижнего ',
   },
   productive_nodes_sheet: {
-    local: '19.Количество продуктивных узлов на главном стебле',
-    futureRemote: '19.Количество продуктивных узлов на главном стебле',
+    local: '19.Количество продуктивных узло',
+    futureRemote: '19.Количество продуктивных узло',
   },
   branch_count_sheet: { local: '20.Количество ветвей', futureRemote: '20.Количество ветвей' },
   productive_pods_sheet: {
-    local: '21.Количество продуктивных бобов',
-    futureRemote: '21.Количество продуктивных бобов',
+    local: '21.Количество продуктивных бобо',
+    futureRemote: '21.Количество продуктивных бобо',
   },
   pods_per_node_sheet: {
-    local: '22.Количество бобов на продуктивный узел',
-    futureRemote: '22.Количество бобов на продуктивный узел',
+    local: '22.Количество бобов на продукти',
+    futureRemote: '22.Количество бобов на продукти',
   },
   seeds_per_plant_sheet: {
     local: '23.Количество семян с растения',
@@ -223,8 +200,8 @@ export const SHEET_ALIASES: Record<LocalSheetKey, { local: string; futureRemote:
     futureRemote: '25.Масса семян с растения',
   },
   yield_per_area_sheet: {
-    local: '26.Урожайность с единицы площади',
-    futureRemote: '26.Урожайность с единицы площади',
+    local: '26.Урожайность с единицы площад',
+    futureRemote: '26.Урожайность с единицы площад',
   },
   thousand_seed_weight_sheet: {
     local: '27.Масса 1000 семян',

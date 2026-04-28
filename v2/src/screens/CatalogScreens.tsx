@@ -31,6 +31,7 @@ export function CatalogScreen({
             const pendingCount = state.syncQueue.filter(
               (item) =>
                 item.varietyId === variety.id &&
+                item.type !== 'create_variety' &&
                 !item.cloudAppliedAt &&
                 ['queued', 'failed', 'waiting_for_auth', 'synced'].includes(item.status),
             ).length;

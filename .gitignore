@@ -8,6 +8,9 @@ node_modules/
 dist/
 web-build/
 expo-env.d.ts
+.expo-*.log
+.expo-*.err
+.expo-*.err.log
 
 # Native
 .kotlin/

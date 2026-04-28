@@ -2,6 +2,7 @@ import React, { PropsWithChildren } from 'react';
 import {
   ActivityIndicator,
   Image,
+  ImageSourcePropType,
   Linking,
   Pressable,
   ScrollView,
@@ -132,13 +133,17 @@ export function StatPill({
 
 export function PhotoFrame({
   uri,
+  source,
   fallback,
 }: {
   uri?: string;
+  source?: ImageSourcePropType;
   fallback: string;
 }) {
-  return uri ? (
-    <Image source={{ uri }} style={styles.photo} />
+  const imageSource = source || (uri ? { uri } : undefined);
+
+  return imageSource ? (
+    <Image source={imageSource} style={styles.photo} />
   ) : (
     <View style={[styles.photo, styles.photoPlaceholder]}>
       <Text style={styles.placeholderText}>{fallback}</Text>

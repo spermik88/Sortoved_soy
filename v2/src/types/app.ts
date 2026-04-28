@@ -61,7 +61,7 @@ export type TaskFlowKind =
   | 'observation_single'
   | 'measurement_cards'
   | 'placeholder_pending_spec';
-export type AuthMode = 'link' | 'create';
+export type AuthMode = 'link' | 'create' | 'resumeCreation';
 export type TaskUiStatus =
   | 'not_started'
   | 'draft'

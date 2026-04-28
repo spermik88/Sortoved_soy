@@ -198,7 +198,7 @@ function TaskSamples({ taskCode }: { taskCode: string }) {
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 12 }}>
             {entry.imageSources.map((source, index) => (
               <View key={`${entry.assetGroupKey}-${index}`} style={{ width: 220, gap: 8 }}>
-                <PhotoFrame uri={source} fallback="Изображение недоступно" />
+                <PhotoFrame source={source} fallback="Изображение недоступно" />
                 <Text style={uiStyles.paragraph}>{`${index + 1}/${entry.imageSources.length}`}</Text>
               </View>
             ))}
@@ -279,6 +279,7 @@ export function FusariumCardsScreen({
         subtitle={variety.title}
         intro={task.cardsHint || task.intro || v2Copy.fusariumCardsHint}
       />
+      <TaskSamples taskCode={task.code} />
       <Card>
         <Text style={uiStyles.paragraph}>{`${v2Copy.taskExamplesTitle}: ${task.title}`}</Text>
         <Text style={uiStyles.paragraph}>{v2Copy.taskExamplesBody}</Text>
@@ -426,6 +427,7 @@ export function PhenologyTaskScreen({
         subtitle={variety.title}
         intro={task.intro || ''}
       />
+      <TaskSamples taskCode={task.code} />
       <Card>
         <Text style={uiStyles.paragraph}>{taskDef.criterionText || ''}</Text>
         {locked ? (
