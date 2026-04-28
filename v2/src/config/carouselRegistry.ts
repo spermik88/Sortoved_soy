@@ -14,7 +14,7 @@ export const carouselRegistry: Record<string, CarouselRegistryEntry> = {
   '4': { taskCode: '4', assetGroupKey: 'flowering_start', available: true, imageSources: [require('../../../assets/carousels/flowering_start/1.начало цветения.jpg')] },
   '5': { taskCode: '5', assetGroupKey: 'flowering_full', available: true, imageSources: [require('../../../assets/carousels/flowering_full/2.полное цветение.jpg')] },
   '6': { taskCode: '6', assetGroupKey: 'downy_mildew', available: true, imageSources: [require('../../../assets/carousels/downy_mildew/21.Пероноспороз.png')] },
-  '7': { taskCode: '7', assetGroupKey: 'cercospora', available: true, imageSources: [require('../../../assets/carousels/cercospora/22.Церкоспороз.jfif')] },
+  '7': { taskCode: '7', assetGroupKey: 'cercospora', available: true, imageSources: [require('../../../assets/carousels/cercospora/22-cercospora.jfif')] },
   '8': { taskCode: '8', assetGroupKey: 'flea_damage', available: true, imageSources: [require('../../../assets/carousels/flea_damage/23.Повреждение соевой полосатой блошкой.png')] },
   '9': { taskCode: '9', assetGroupKey: 'aphid_damage', available: true, imageSources: [require('../../../assets/carousels/aphid_damage/24.Повреждение тлей.png')] },
   '10': { taskCode: '10', assetGroupKey: 'flower_color', available: true, imageSources: [require('../../../assets/carousels/flower_color/27.Окраска цветка.png')] },
@@ -22,8 +22,8 @@ export const carouselRegistry: Record<string, CarouselRegistryEntry> = {
   '12': { taskCode: '12', assetGroupKey: 'lateral_leaf_shape', available: true, imageSources: [require('../../../assets/carousels/lateral_leaf_shape/26.Форма бокового листочка.png')] },
   '13': { taskCode: '13', assetGroupKey: 'full_maturity', available: true, imageSources: [require('../../../assets/carousels/full_maturity/4.полное созревание.jpg')] },
   '14': { taskCode: '14', assetGroupKey: 'stem_pubescence_color', available: true, imageSources: [require('../../../assets/carousels/stem_pubescence_color/25.Окраска опушения главного стебля.png')] },
-  '15': { taskCode: '15', assetGroupKey: 'lodging_resistance', available: true, imageSources: [require('../../../assets/carousels/lodging_resistance/28.Устойчивость к полеганию.jfif')] },
-  '16': { taskCode: '16', assetGroupKey: 'shattering_resistance', available: true, imageSources: [require('../../../assets/carousels/shattering_resistance/29.Устойчивость к осыпанию.jfif')] },
+  '15': { taskCode: '15', assetGroupKey: 'lodging_resistance', available: true, imageSources: [require('../../../assets/carousels/lodging_resistance/28-lodging-resistance.jfif')] },
+  '16': { taskCode: '16', assetGroupKey: 'shattering_resistance', available: true, imageSources: [require('../../../assets/carousels/shattering_resistance/29-shattering-resistance.jfif')] },
   '17': {
     taskCode: '17',
     assetGroupKey: 'stem_length',
@@ -107,6 +107,6 @@ export const carouselRegistry: Record<string, CarouselRegistryEntry> = {
   },
   '26': { taskCode: '26', assetGroupKey: 'yield_per_area', available: false, imageSources: [] },
   '27': { taskCode: '27', assetGroupKey: 'thousand_seed_weight', available: true, imageSources: [require('../../../assets/carousels/thousand_seed_weight/15.Масса 1000 семян.png')] },
-  '28': { taskCode: '28', assetGroupKey: 'protein_content', available: true, imageSources: [require('../../../assets/carousels/protein_content/16.Содержание белка.jfif')] },
-  '29': { taskCode: '29', assetGroupKey: 'oil_content', available: true, imageSources: [require('../../../assets/carousels/oil_content/17.Содержание жира.jfif')] },
+  '28': { taskCode: '28', assetGroupKey: 'protein_content', available: true, imageSources: [require('../../../assets/carousels/protein_content/16-protein-content.jfif')] },
+  '29': { taskCode: '29', assetGroupKey: 'oil_content', available: true, imageSources: [require('../../../assets/carousels/oil_content/17-oil-content.jfif')] },
 };

@@ -117,7 +117,9 @@ export async function processQueuedOperation(
       const media: QueuedMediaUpload = operation.media[index];
       if (!media.remoteUrl) {
         const targetSheet = media.targetSheet || PLOTS_SHEET_NAME;
-        const folderId = variety?.setup?.drive?.foldersBySheet?.[targetSheet]?.folderId;
+        const folderId =
+          variety?.setup?.drive?.foldersBySheet?.[targetSheet]?.folderId ||
+          variety?.setup?.drive?.varietyFolderId;
         if (variety?.setup?.drive?.varietyFolderId) {
           await driveService.assertFolderWritable(deps.session.accessToken, variety.setup.drive.varietyFolderId);
         }

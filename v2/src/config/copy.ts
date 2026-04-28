@@ -148,6 +148,7 @@ export const v2Copy = {
   varietyNameRequired: 'Введите название сорта',
   taskOverviewRequired: 'Сначала добавьте обзорное фото',
   taskOverviewStepRequired: 'Сначала завершите обзор делянки',
+  taskPlotPhotoRequired: 'Для каждой делянки нужны фото, геометка и подтверждение критерия',
   taskInfectionCardsRequired: 'Заполните все карточки заражений',
   taskMeasurementRequired: 'Для измерений нужны фото, значение и номер делянки',
   taskDiseasePhotoRequired: 'Для карточки заболевания нужно фото растения',

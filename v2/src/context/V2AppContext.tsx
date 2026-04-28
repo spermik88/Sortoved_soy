@@ -89,6 +89,10 @@ const initialState: PersistedV2State = {
 };
 const LOCAL_PHOTO_RETENTION_MS = 90 * 24 * 60 * 60 * 1000;
 
+interface QueueProcessOptions {
+  retryFailed?: boolean;
+}
+
 function buildLocalBinding(
   varietyId: string,
   title: string,
@@ -877,6 +881,7 @@ interface V2ContextValue {
   completeTaskLocally(varietyId: string, taskCode: string): void;
   queueTaskSubmission(varietyId: string, taskCode: string): Promise<void>;
   processQueue(): Promise<void>;
+  removeQueueOperation(operationId: string): void;
 }
 
 const V2AppContext = createContext<V2ContextValue | undefined>(undefined);
@@ -1739,10 +1744,20 @@ export function V2AppProvider({ children }: { children: ReactNode }) {
     });
   }
 
-  async function processQueueInternal(queueOverride?: QueuedOperation[]) {
+  async function processQueueInternal(
+    queueOverride?: QueuedOperation[],
+    options: QueueProcessOptions = {},
+  ) {
     let workingQueue = queueOverride || stateRef.current.syncQueue;
     for (const item of workingQueue) {
-      if (!['queued', 'failed'].includes(item.status) || item.localAppliedAt) {
+      if (
+        item.localAppliedAt ||
+        item.status === 'processing' ||
+        item.status === 'waiting_for_auth' ||
+        item.status === 'synced' ||
+        (item.status === 'failed' && !options.retryFailed) ||
+        !['queued', 'failed'].includes(item.status)
+      ) {
         continue;
       }
 
@@ -1956,7 +1971,7 @@ export function V2AppProvider({ children }: { children: ReactNode }) {
 
     const cloudQueue = workingQueue.filter(
       (item) =>
-        ['synced', 'failed'].includes(item.status) &&
+        (item.status === 'synced' || (item.status === 'failed' && options.retryFailed)) &&
         item.localAppliedAt &&
         !item.cloudAppliedAt,
     );
@@ -3010,21 +3025,21 @@ export function V2AppProvider({ children }: { children: ReactNode }) {
             !currentTask.phenologyPlots ||
             !Object.values(currentTask.phenologyPlots).every(isPhenologyPlotComplete)
           ) {
-            throw new Error(v2Copy.taskOverviewRequired);
+            throw new Error(v2Copy.taskPlotPhotoRequired);
           }
         } else if (currentTask.flowKind === 'choice_by_plot') {
           if (
             !currentTask.choicePlots ||
             !Object.values(currentTask.choicePlots).every(isChoicePlotComplete)
           ) {
-            throw new Error(v2Copy.taskOverviewRequired);
+            throw new Error(v2Copy.taskPlotPhotoRequired);
           }
         } else if (currentTask.flowKind === 'score_by_plot') {
           if (
             !currentTask.scorePlots ||
             !Object.values(currentTask.scorePlots).every(isScorePlotComplete)
           ) {
-            throw new Error(v2Copy.taskOverviewRequired);
+            throw new Error(v2Copy.taskPlotPhotoRequired);
           }
         } else if (currentTask.flowKind === 'yield_by_plot') {
           if (
@@ -3347,7 +3362,50 @@ export function V2AppProvider({ children }: { children: ReactNode }) {
         await processQueueInternal(nextQueue);
       },
       async processQueue() {
-        await processQueueInternal();
+        await processQueueInternal(undefined, { retryFailed: true });
+      },
+      removeQueueOperation(operationId) {
+        setState((current) => {
+          const target = current.syncQueue.find((entry) => entry.id === operationId);
+          const nextQueue = current.syncQueue.filter((entry) => entry.id !== operationId);
+          const taskCode = String(target?.payload.taskCode || target?.screenId || '');
+          const existingTask =
+            target?.varietyId && taskCode
+              ? current.inspections[target.varietyId]?.[taskCode]
+              : undefined;
+          const nextTask =
+            target?.varietyId && taskCode && existingTask
+              ? ({
+                  ...existingTask,
+                  cloudStatus:
+                    existingTask.cloudStatus === 'cloud_failed' ||
+                    existingTask.cloudStatus === 'waiting_for_auth'
+                      ? 'idle'
+                      : existingTask.cloudStatus,
+                  updatedAt: new Date().toISOString(),
+                } satisfies InspectionTask)
+              : undefined;
+
+          const next = {
+            ...current,
+            syncQueue: nextQueue,
+            inspections:
+              target?.varietyId && taskCode && nextTask
+                ? {
+                    ...current.inspections,
+                    [target.varietyId]: {
+                      ...current.inspections[target.varietyId],
+                      [taskCode]: {
+                        ...nextTask,
+                        uiStatus: getTaskUiStatus(target.varietyId, nextTask, nextQueue),
+                      },
+                    },
+                  }
+                : normalizeInspections(current.inspections, nextQueue),
+          };
+          stateRef.current = next;
+          return next;
+        });
       },
     }),
     [creationStepIndex, hydrated, online, state],

@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React from 'react';
 import { Alert, Text, View } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 
@@ -18,10 +18,6 @@ export function CatalogScreen({
 }: NativeStackScreenProps<V2RootStackParamList, 'Catalog'>) {
   const { state, processQueue } = useV2App();
 
-  useEffect(() => {
-    void processQueue();
-  }, [processQueue]);
-
   return (
     <Screen>
       <Title>{v2Copy.catalogTitle}</Title>
@@ -33,12 +29,23 @@ export function CatalogScreen({
                 item.varietyId === variety.id &&
                 item.type !== 'create_variety' &&
                 !item.cloudAppliedAt &&
-                ['queued', 'failed', 'waiting_for_auth', 'synced'].includes(item.status),
+                ['queued', 'processing', 'waiting_for_auth', 'synced'].includes(item.status),
             ).length;
+            const failedCount = state.syncQueue.filter(
+              (item) =>
+                item.varietyId === variety.id &&
+                item.type !== 'create_variety' &&
+                !item.cloudAppliedAt &&
+                item.status === 'failed',
+            ).length;
+            const queueLabel = [
+              pendingCount ? `ожидают отправки: ${pendingCount}` : '',
+              failedCount ? `ошибки отправки: ${failedCount}` : '',
+            ].filter(Boolean).join(', ');
             return (
               <Button
                 key={variety.id}
-                label={pendingCount ? `${variety.title} - ожидают отправки: ${pendingCount}` : variety.title}
+                label={queueLabel ? `${variety.title} - ${queueLabel}` : variety.title}
                 onPress={() => navigation.navigate('Variety', { varietyId: variety.id })}
               />
             );
@@ -51,7 +58,8 @@ export function CatalogScreen({
           variant="secondary"
           onPress={() => navigation.navigate('Start')}
         />
-        <Button label="Повторить отправку" variant="secondary" onPress={() => void processQueue()} />
+        <Button label="Локальная очередь" variant="secondary" onPress={() => navigation.navigate('Queue')} />
+        <Button label="Повторить ошибки отправки" variant="secondary" onPress={() => void processQueue()} />
       </Card>
     </Screen>
   );
