@@ -1,4 +1,4 @@
-import { StatusBar } from 'expo-status-bar';
+import { StatusBar } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { V2AppProvider } from './src/context/V2AppContext';
@@ -8,7 +8,7 @@ export default function AppV2() {
   return (
     <SafeAreaProvider>
       <V2AppProvider>
-        <StatusBar style="dark" />
+        <StatusBar barStyle="dark-content" />
         <V2AppNavigator />
       </V2AppProvider>
     </SafeAreaProvider>

@@ -40,6 +40,7 @@ import {
   DiseaseSheetKey,
   FatContentDraft,
   FatContentSheetKey,
+  GoogleSession,
   InspectionCardDraft,
   InspectionTask,
   LocalSheetKey,
@@ -781,9 +782,9 @@ interface V2ContextValue {
   hydrated: boolean;
   state: PersistedV2State;
   online: boolean;
-  prepareMode(mode: AuthMode): Promise<void>;
+  prepareMode(mode: AuthMode, session: GoogleSession): Promise<void>;
   signOut(): Promise<void>;
-  reauthorizeAndResumeQueue(): Promise<void>;
+  reauthorizeAndResumeQueue(session: GoogleSession): Promise<void>;
   importVarietyFromClipboard(): Promise<void>;
   beginCreation(): void;
   cancelCreation(): void;
@@ -1734,8 +1735,8 @@ export function V2AppProvider({ children }: { children: ReactNode }) {
   }
 
   async function processQueueInternal(queueOverride?: QueuedOperation[]) {
-    const queue = queueOverride || stateRef.current.syncQueue;
-    for (const item of queue) {
+    let workingQueue = queueOverride || stateRef.current.syncQueue;
+    for (const item of workingQueue) {
       if (!['queued', 'failed'].includes(item.status) || item.localAppliedAt) {
         continue;
       }
@@ -1829,6 +1830,7 @@ export function V2AppProvider({ children }: { children: ReactNode }) {
         await new Promise((resolve) => setTimeout(resolve, 50));
 
         setState((current) => {
+          const appliedAt = item.localAppliedAt || new Date().toISOString();
           const nextQueue: QueuedOperation[] = current.syncQueue.map((entry) =>
             entry.id === item.id
               ? ({
@@ -1836,19 +1838,30 @@ export function V2AppProvider({ children }: { children: ReactNode }) {
                   status: 'synced',
                   updatedAt: new Date().toISOString(),
                   lastError: undefined,
-                  localAppliedAt: entry.localAppliedAt || new Date().toISOString(),
+                  localAppliedAt: entry.localAppliedAt || appliedAt,
                 } satisfies QueuedOperation)
               : entry,
           );
+          workingQueue = workingQueue.map((entry) =>
+            entry.id === item.id
+              ? {
+                  ...entry,
+                  status: 'synced',
+                  updatedAt: new Date().toISOString(),
+                  lastError: undefined,
+                  localAppliedAt: entry.localAppliedAt || appliedAt,
+                }
+              : entry,
+          );
 
-          return {
+          const next = {
             ...current,
             syncQueue: nextQueue,
             catalog: current.catalog.map((variety) =>
               variety.id === item.varietyId
                 ? {
                     ...variety,
-                    status: 'ready',
+                    status: 'ready' as const,
                     updatedAt: new Date().toISOString(),
                     lastError: undefined,
                   }
@@ -1856,6 +1869,8 @@ export function V2AppProvider({ children }: { children: ReactNode }) {
             ),
             inspections: normalizeInspections(current.inspections, nextQueue),
           };
+          stateRef.current = next;
+          return next;
         });
       } catch (error) {
         setState((current) => {
@@ -1875,14 +1890,14 @@ export function V2AppProvider({ children }: { children: ReactNode }) {
               : entry,
           );
 
-          return {
+          const next = {
             ...current,
             syncQueue: nextQueue,
             catalog: current.catalog.map((variety) =>
               variety.id === item.varietyId
                 ? {
                     ...variety,
-                    status: 'error',
+                    status: 'error' as const,
                     updatedAt: new Date().toISOString(),
                     lastError:
                       error instanceof Error ? error.message : v2Copy.localSyncError,
@@ -1901,7 +1916,7 @@ export function V2AppProvider({ children }: { children: ReactNode }) {
                         card.id === cardId
                           ? {
                               ...card,
-                              syncStatus: 'failed',
+                              syncStatus: 'failed' as const,
                               queuedOperationId: item.id,
                             }
                           : card,
@@ -1915,7 +1930,7 @@ export function V2AppProvider({ children }: { children: ReactNode }) {
                             card.id === cardId
                               ? {
                                   ...card,
-                                  syncStatus: 'failed',
+                                  syncStatus: 'failed' as const,
                                   queuedOperationId: item.id,
                                 }
                               : card,
@@ -1928,11 +1943,13 @@ export function V2AppProvider({ children }: { children: ReactNode }) {
                 }
               : current.inspections,
           };
+          stateRef.current = next;
+          return next;
         });
       }
     }
 
-    const cloudQueue = (queueOverride || stateRef.current.syncQueue).filter(
+    const cloudQueue = workingQueue.filter(
       (item) =>
         ['synced', 'failed'].includes(item.status) &&
         item.localAppliedAt &&
@@ -1981,7 +1998,7 @@ export function V2AppProvider({ children }: { children: ReactNode }) {
                 } satisfies InspectionTask)
               : undefined;
 
-          return {
+          const next = {
             ...current,
             syncQueue: nextQueue,
             inspections:
@@ -1998,6 +2015,8 @@ export function V2AppProvider({ children }: { children: ReactNode }) {
                   }
                 : current.inspections,
           };
+          stateRef.current = next;
+          return next;
         });
       } catch (error) {
         const isAuthRequired =
@@ -2033,7 +2052,7 @@ export function V2AppProvider({ children }: { children: ReactNode }) {
                 } satisfies InspectionTask)
               : undefined;
 
-          return {
+          const next = {
             ...current,
             syncQueue: nextQueue,
             pendingAuthMode: isAuthRequired ? current.pendingAuthMode || 'link' : current.pendingAuthMode,
@@ -2051,6 +2070,8 @@ export function V2AppProvider({ children }: { children: ReactNode }) {
                   }
                 : current.inspections,
           };
+          stateRef.current = next;
+          return next;
         });
       }
     }
@@ -2133,10 +2154,13 @@ export function V2AppProvider({ children }: { children: ReactNode }) {
       hydrated,
       state,
       online,
-      async prepareMode(mode) {
-        setState((current) => ({ ...current, pendingAuthMode: mode }));
-        const session = await authService.signIn();
-        setState((current) => ({ ...current, session, pendingAuthMode: mode }));
+      async prepareMode(mode, session) {
+        await authService.persistSession(session);
+        setState((current) => {
+          const next = { ...current, session, pendingAuthMode: mode };
+          stateRef.current = next;
+          return next;
+        });
       },
       async signOut() {
         await authService.signOut(stateRef.current.session);
@@ -2155,8 +2179,8 @@ export function V2AppProvider({ children }: { children: ReactNode }) {
           ),
         }));
       },
-      async reauthorizeAndResumeQueue() {
-        const session = await authService.signIn();
+      async reauthorizeAndResumeQueue(session) {
+        await authService.persistSession(session);
         const resumedQueue = stateRef.current.syncQueue.map((entry) =>
           entry.status === 'waiting_for_auth'
             ? ({
@@ -2293,6 +2317,7 @@ export function V2AppProvider({ children }: { children: ReactNode }) {
         }));
       },
       async completeCreation() {
+        console.log('[Creation] completeCreation:start');
         const draft = stateRef.current.creationDraft;
         const session = stateRef.current.session;
         if (!draft) {
@@ -2309,7 +2334,12 @@ export function V2AppProvider({ children }: { children: ReactNode }) {
 
         const varietyId = createId('variety');
         const now = new Date().toISOString();
+        console.log('[Creation] creating Drive setup', { title });
         const drive = await createDriveSetup(session.accessToken, title, session.email);
+        console.log('[Creation] Drive setup created', {
+          rootFolderId: drive.rootFolderId,
+          varietyFolderId: drive.varietyFolderId,
+        });
         const setupSnapshot: VarietySetupSnapshot = {
           mapsUrl: draft.mapsUrl,
           plotPhotos: {
@@ -2327,11 +2357,16 @@ export function V2AppProvider({ children }: { children: ReactNode }) {
           .buildCreationWrites(draft)
           .map((write) => (write.sheet === '00.meta' ? templateService.buildMetaWrite(setupSnapshot) : write));
         const remoteSheets = [...TEMPLATE_WORKSHEET_NAMES];
+        console.log('[Creation] creating spreadsheet', { title, sheetCount: remoteSheets.length });
         const createdSpreadsheet = await sheetsService.createSpreadsheet(
           session.accessToken,
           title,
           remoteSheets,
         );
+        console.log('[Creation] spreadsheet created', {
+          spreadsheetId: createdSpreadsheet.spreadsheetId,
+          spreadsheetUrl: createdSpreadsheet.spreadsheetUrl,
+        });
         const inspectedSpreadsheet = await sheetsService.inspectSpreadsheet(
           session.accessToken,
           createdSpreadsheet.spreadsheetUrl,
@@ -2374,15 +2409,29 @@ export function V2AppProvider({ children }: { children: ReactNode }) {
             })),
         };
 
-        setState((current) => ({
-          ...current,
-          catalog: [...current.catalog, record],
-          creationDraft: null,
-          pendingAuthMode: null,
-          syncQueue: [operation, ...current.syncQueue],
-        }));
+        setState((current) => {
+          const next = {
+            ...current,
+            catalog: [...current.catalog, record],
+            creationDraft: null,
+            pendingAuthMode: null,
+            syncQueue: [operation, ...current.syncQueue],
+          };
+          stateRef.current = next;
+          return next;
+        });
         setCreationStepIndex(0);
-        await processQueueInternal([operation, ...stateRef.current.syncQueue]);
+        console.log('[Creation] processing queue', { operationId: operation.id });
+        await processQueueInternal([operation, ...stateRef.current.syncQueue.filter((entry) => entry.id !== operation.id)]);
+        const syncedOperation = stateRef.current.syncQueue.find((entry) => entry.id === operation.id);
+        if (!syncedOperation?.cloudAppliedAt) {
+          throw new Error(
+            syncedOperation?.cloudError ||
+              syncedOperation?.lastError ||
+              'Cloud creation did not finish. Проверьте локальную очередь.',
+          );
+        }
+        console.log('[Creation] completeCreation:done', { varietyId });
         return record;
       },
       getVariety(varietyId) {

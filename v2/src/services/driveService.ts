@@ -23,6 +23,26 @@ export interface DriveService {
 const DRIVE_BASE = 'https://www.googleapis.com/drive/v3/files';
 const DRIVE_UPLOAD_BASE = 'https://www.googleapis.com/upload/drive/v3/files';
 const FOLDER_MIME = 'application/vnd.google-apps.folder';
+const GOOGLE_REQUEST_TIMEOUT_MS = 30000;
+
+async function fetchWithTimeout(url: string, init?: RequestInit) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), GOOGLE_REQUEST_TIMEOUT_MS);
+
+  try {
+    return await fetch(url, {
+      ...init,
+      signal: controller.signal,
+    });
+  } catch (error) {
+    if (error instanceof Error && error.name === 'AbortError') {
+      throw new Error('Google Drive request timed out. Проверьте интернет/VPN и повторите.');
+    }
+    throw error;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
 
 function escapeDriveQueryValue(value: string) {
   return value.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
@@ -42,15 +62,22 @@ function imageFormulaUrl(id: string) {
 
 async function ensureOk(response: Response, message: string) {
   if (!response.ok) {
-    throw new Error(`${message}: ${response.status}`);
+    let details = '';
+    try {
+      details = await response.text();
+    } catch {
+      details = '';
+    }
+    throw new Error(`${message}: ${response.status}${details ? ` ${details}` : ''}`);
   }
 }
 
 class GoogleDriveService implements DriveService {
   async findOrCreateFolder(accessToken: string, name: string, parentId?: string) {
+    console.log('[Drive] findOrCreateFolder', { name, parentId });
     const parentClause = parentId ? `'${parentId}' in parents and ` : '';
     const query = `${parentClause}name='${escapeDriveQueryValue(name)}' and mimeType='${FOLDER_MIME}' and trashed=false`;
-    const response = await fetch(
+    const response = await fetchWithTimeout(
       `${DRIVE_BASE}?q=${encodeURIComponent(query)}&fields=files(id,name,webViewLink)&pageSize=1`,
       {
         headers: { Authorization: `Bearer ${accessToken}` },
@@ -63,7 +90,8 @@ class GoogleDriveService implements DriveService {
   }
 
   async createFolder(accessToken: string, name: string, parentId?: string) {
-    const response = await fetch(`${DRIVE_BASE}?fields=id,webViewLink`, {
+    console.log('[Drive] createFolder', { name, parentId });
+    const response = await fetchWithTimeout(`${DRIVE_BASE}?fields=id,webViewLink`, {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${accessToken}`,
@@ -81,7 +109,8 @@ class GoogleDriveService implements DriveService {
   }
 
   async shareFolderForEditingByLink(accessToken: string, folderId: string) {
-    const response = await fetch(`https://www.googleapis.com/drive/v3/files/${folderId}/permissions`, {
+    console.log('[Drive] shareFolderForEditingByLink', { folderId });
+    const response = await fetchWithTimeout(`https://www.googleapis.com/drive/v3/files/${folderId}/permissions`, {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${accessToken}`,
@@ -97,7 +126,7 @@ class GoogleDriveService implements DriveService {
   }
 
   async assertFolderWritable(accessToken: string, folderId: string) {
-    const response = await fetch(
+    const response = await fetchWithTimeout(
       `${DRIVE_BASE}/${folderId}?fields=id,capabilities/canAddChildren,capabilities/canEdit`,
       {
         headers: { Authorization: `Bearer ${accessToken}` },
@@ -113,6 +142,7 @@ class GoogleDriveService implements DriveService {
   }
 
   async uploadPhoto(accessToken: string, localUri: string, fileName: string, parentId?: string) {
+    console.log('[Drive] uploadPhoto', { fileName, parentId });
     const form = new FormData();
     form.append(
       'metadata',
@@ -126,7 +156,7 @@ class GoogleDriveService implements DriveService {
       type: 'image/jpeg',
     } as unknown as Blob);
 
-    const response = await fetch(
+    const response = await fetchWithTimeout(
       `${DRIVE_UPLOAD_BASE}?uploadType=multipart&fields=id,webViewLink,webContentLink`,
       {
         method: 'POST',

@@ -639,7 +639,7 @@ class WorkbookTemplateService implements TemplateService {
         workbook,
         'первое фото делянки',
         plot,
-        draft.plots[plot].photoUri || '',
+        draft.plots[plot].photoUri ? PHOTO_PENDING_UPLOAD : '',
       );
     });
 

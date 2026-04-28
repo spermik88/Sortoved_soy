@@ -17,6 +17,36 @@ export interface SyncQueueDependencies {
   task?: InspectionTask;
 }
 
+function prepareWrites(
+  variety: VarietyRecord,
+  operation: QueuedOperation,
+) {
+  return (operation.writes || []).map((rawWrite) => {
+    const write = retargetWriteToRemoteSheet(variety, rawWrite);
+    if (!operation.media?.length) {
+      return write;
+    }
+
+    let mediaIndex = 0;
+    return {
+      ...write,
+      values: write.values.map((row) =>
+        row.map((cell) => {
+          if (cell !== 'photo_pending_upload') {
+            return cell;
+          }
+
+          const mediaItem = operation.media?.[mediaIndex];
+          mediaIndex += 1;
+          return mediaItem?.remoteId && mediaItem.remoteUrl
+            ? driveImageFormula(mediaItem.remoteId, mediaItem.remoteUrl)
+            : mediaItem?.remoteUrl || '';
+        }),
+      ),
+    };
+  });
+}
+
 function resolveRemoteWriteSheet(variety: VarietyRecord, sheet: string) {
   const match = Object.entries(SHEET_ALIASES).find(([, alias]) => alias.local === sheet);
   if (!match) {
@@ -72,6 +102,14 @@ export async function processQueuedOperation(
   const variety = operation.varietyId
     ? deps.catalog.find((item) => item.id === operation.varietyId)
     : undefined;
+
+  if (operation.type === 'create_variety' && variety && operation.writes?.length) {
+    await sheetsService.writeOperations(
+      deps.session.accessToken,
+      variety.binding.spreadsheetId,
+      prepareWrites(variety, { ...operation, media: [] }),
+    );
+  }
 
   if (operation.media?.length) {
     for (let index = 0; index < operation.media.length; index += 1) {
@@ -129,35 +167,10 @@ export async function processQueuedOperation(
   }
 
   if (operation.writes?.length) {
-    const writes = operation.writes.map((rawWrite) => {
-      const write = retargetWriteToRemoteSheet(variety, rawWrite);
-      if (!operation.media?.length) {
-        return write;
-      }
-
-      let mediaIndex = 0;
-      return {
-        ...write,
-        values: write.values.map((row) =>
-          row.map((cell) => {
-            if (cell !== 'photo_pending_upload') {
-              return cell;
-            }
-
-            const mediaItem = operation.media?.[mediaIndex];
-            mediaIndex += 1;
-            return mediaItem?.remoteId && mediaItem.remoteUrl
-              ? driveImageFormula(mediaItem.remoteId, mediaItem.remoteUrl)
-              : mediaItem?.remoteUrl || '';
-          }),
-        ),
-      };
-    });
-
     await sheetsService.writeOperations(
       deps.session.accessToken,
       variety.binding.spreadsheetId,
-      writes,
+      prepareWrites(variety, operation),
     );
   }
 

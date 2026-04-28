@@ -29,7 +29,6 @@ export function CreationScreen({
     nextCreationStep,
     prevCreationStep,
     captureLocation,
-    completeCreation,
   } = useV2App();
   const draft = state.creationDraft;
   const [driveConsentAccepted, setDriveConsentAccepted] = useState(false);
@@ -62,15 +61,7 @@ export function CreationScreen({
     setSubmitError(null);
     try {
       if (isLast) {
-        setSubmitting(true);
-        const variety = await completeCreation();
-        navigation.reset({
-          index: 1,
-          routes: [
-            { name: 'Catalog' },
-            { name: 'Variety', params: { varietyId: variety.id } },
-          ],
-        });
+        navigation.navigate('CreationCloudSync');
         return;
       }
 

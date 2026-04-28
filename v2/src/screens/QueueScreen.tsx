@@ -10,7 +10,7 @@ import { V2RootStackParamList } from '../navigation/types';
 export function QueueScreen({
   navigation,
 }: NativeStackScreenProps<V2RootStackParamList, 'Queue'>) {
-  const { state, online, processQueue, reauthorizeAndResumeQueue } = useV2App();
+  const { state, online, processQueue } = useV2App();
   const hasAuthWait = state.syncQueue.some((item) => item.status === 'waiting_for_auth');
 
   return (
@@ -57,7 +57,7 @@ export function QueueScreen({
           <Button
             label="Авторизоваться и продолжить Google sync"
             variant="secondary"
-            onPress={() => void reauthorizeAndResumeQueue()}
+            onPress={() => navigation.navigate('Auth', { mode: 'link' })}
           />
         ) : null}
         <Button label={v2Copy.queueRetry} onPress={() => void processQueue()} />

@@ -3,6 +3,7 @@ export type V2RootStackParamList = {
   Auth: { mode: 'link' | 'create' };
   Catalog: undefined;
   Creation: undefined;
+  CreationCloudSync: undefined;
   Variety: { varietyId: string };
   FusariumCards: { varietyId: string; taskCode: string };
   ChoiceTask: { varietyId: string; taskCode: string };

@@ -6,10 +6,36 @@ import {
 } from './sheetAliasService';
 
 const SHEETS_BASE = 'https://sheets.googleapis.com/v4/spreadsheets';
+const GOOGLE_REQUEST_TIMEOUT_MS = 30000;
 
-function ensureOk(response: Response) {
+async function fetchWithTimeout(url: string, init?: RequestInit) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), GOOGLE_REQUEST_TIMEOUT_MS);
+
+  try {
+    return await fetch(url, {
+      ...init,
+      signal: controller.signal,
+    });
+  } catch (error) {
+    if (error instanceof Error && error.name === 'AbortError') {
+      throw new Error('Google Sheets request timed out. Проверьте интернет/VPN и повторите.');
+    }
+    throw error;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+async function ensureOk(response: Response) {
   if (!response.ok) {
-    throw new Error(`Google Sheets API error: ${response.status}`);
+    let details = '';
+    try {
+      details = await response.text();
+    } catch {
+      details = '';
+    }
+    throw new Error(`Google Sheets API error: ${response.status}${details ? ` ${details}` : ''}`);
   }
 }
 
@@ -54,12 +80,13 @@ class GoogleSheetsService implements SheetsService {
     }
 
     const spreadsheetId = extractSpreadsheetId(inputUrl);
-    const response = await fetch(`${SHEETS_BASE}/${spreadsheetId}?fields=properties.title,sheets.properties`, {
+    console.log('[Sheets] inspectSpreadsheet', { spreadsheetId });
+    const response = await fetchWithTimeout(`${SHEETS_BASE}/${spreadsheetId}?fields=properties.title,sheets.properties`, {
       headers: {
         Authorization: `Bearer ${accessToken}`,
       },
     });
-    ensureOk(response);
+    await ensureOk(response);
     const data = (await response.json()) as {
       properties?: { title?: string };
       sheets?: { properties?: { sheetId?: number; title?: string } }[];
@@ -82,7 +109,8 @@ class GoogleSheetsService implements SheetsService {
   }
 
   async createSpreadsheet(accessToken: string, title: string, sheets: string[]) {
-    const response = await fetch(SHEETS_BASE, {
+    console.log('[Sheets] createSpreadsheet', { title, sheetCount: sheets.length });
+    const response = await fetchWithTimeout(SHEETS_BASE, {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${accessToken}`,
@@ -95,7 +123,7 @@ class GoogleSheetsService implements SheetsService {
         })),
       }),
     });
-    ensureOk(response);
+    await ensureOk(response);
     const data = (await response.json()) as { spreadsheetId: string; spreadsheetUrl: string };
 
     return {
@@ -105,12 +133,12 @@ class GoogleSheetsService implements SheetsService {
   }
 
   async readRange(accessToken: string, spreadsheetId: string, range: string) {
-    const response = await fetch(`${SHEETS_BASE}/${spreadsheetId}/values/${encodeURIComponent(range)}`, {
+    const response = await fetchWithTimeout(`${SHEETS_BASE}/${spreadsheetId}/values/${encodeURIComponent(range)}`, {
       headers: {
         Authorization: `Bearer ${accessToken}`,
       },
     });
-    ensureOk(response);
+    await ensureOk(response);
     const data = (await response.json()) as { values?: (string | number | boolean)[][] };
     return data.values || [];
   }
@@ -121,12 +149,12 @@ class GoogleSheetsService implements SheetsService {
 
   async batchGet(accessToken: string, spreadsheetId: string, ranges: string[]) {
     const query = ranges.map((range) => `ranges=${encodeURIComponent(range)}`).join('&');
-    const response = await fetch(`${SHEETS_BASE}/${spreadsheetId}/values:batchGet?${query}`, {
+    const response = await fetchWithTimeout(`${SHEETS_BASE}/${spreadsheetId}/values:batchGet?${query}`, {
       headers: {
         Authorization: `Bearer ${accessToken}`,
       },
     });
-    ensureOk(response);
+    await ensureOk(response);
     const data = (await response.json()) as {
       valueRanges?: { range?: string; values?: (string | number | boolean)[][] }[];
     };
@@ -144,7 +172,7 @@ class GoogleSheetsService implements SheetsService {
         operation.strategy === 'upload-meta'
       ) {
         const appendRange = encodeURIComponent(operation.range || `${operation.sheet}!A1`);
-        const response = await fetch(
+        const response = await fetchWithTimeout(
           `${SHEETS_BASE}/${spreadsheetId}/values/${appendRange}:append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS`,
           {
             method: 'POST',
@@ -155,11 +183,11 @@ class GoogleSheetsService implements SheetsService {
             body: JSON.stringify({ values: operation.values }),
           },
         );
-        ensureOk(response);
+        await ensureOk(response);
         continue;
       }
 
-      const response = await fetch(
+      const response = await fetchWithTimeout(
         `${SHEETS_BASE}/${spreadsheetId}/values/${encodeURIComponent(
           operation.range || `${operation.sheet}!A1`,
         )}?valueInputOption=USER_ENTERED`,
@@ -172,7 +200,7 @@ class GoogleSheetsService implements SheetsService {
           body: JSON.stringify({ values: operation.values }),
         },
       );
-      ensureOk(response);
+      await ensureOk(response);
     }
   }
 
@@ -180,7 +208,7 @@ class GoogleSheetsService implements SheetsService {
     if (!requests.length) {
       return;
     }
-    const response = await fetch(`${SHEETS_BASE}/${spreadsheetId}:batchUpdate`, {
+    const response = await fetchWithTimeout(`${SHEETS_BASE}/${spreadsheetId}:batchUpdate`, {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${accessToken}`,
@@ -188,7 +216,7 @@ class GoogleSheetsService implements SheetsService {
       },
       body: JSON.stringify({ requests }),
     });
-    ensureOk(response);
+    await ensureOk(response);
   }
 }
 

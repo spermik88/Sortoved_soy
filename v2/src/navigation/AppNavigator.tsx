@@ -6,6 +6,7 @@ import { LoadingBlock } from '../components/Ui';
 import { v2Copy } from '../config/copy';
 import { useV2App } from '../context/V2AppContext';
 import { CatalogScreen, VarietyScreen } from '../screens/CatalogScreens';
+import { CreationCloudSyncScreen } from '../screens/CreationCloudSyncScreen';
 import { CreationScreen } from '../screens/CreationScreen';
 import { QueueScreen } from '../screens/QueueScreen';
 import { AuthScreen, StartScreen } from '../screens/StartScreens';
@@ -41,6 +42,7 @@ export function V2AppNavigator() {
         <Stack.Screen name="Auth" component={AuthScreen} />
         <Stack.Screen name="Catalog" component={CatalogScreen} />
         <Stack.Screen name="Creation" component={CreationScreen} />
+        <Stack.Screen name="CreationCloudSync" component={CreationCloudSyncScreen} />
         <Stack.Screen name="Variety" component={VarietyScreen} />
         <Stack.Screen name="FusariumCards" component={FusariumCardsScreen} />
         <Stack.Screen name="ChoiceTask" component={ChoiceTaskScreen} />

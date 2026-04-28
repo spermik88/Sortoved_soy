@@ -1,6 +1,7 @@
 {
   "expo": {
     "name": "Sortoved Soy",
+    "owner": "spermik",
     "slug": "sortoved-soy",
     "scheme": "sortovedsoy",
     "version": "1.0.0",

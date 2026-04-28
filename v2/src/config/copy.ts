@@ -174,6 +174,12 @@ Object.assign(taskStatusLabels, {
 });
 
 Object.assign(v2Copy, {
+  authCreateBody:
+    'Для создания сорта приложение авторизуется в Google и получает доступ к созданию и редактированию файлов Drive и Sheets. После входа будет открыт мастер создания сорта.',
+  authCreateAction: 'Авторизоваться в Google',
+});
+
+Object.assign(v2Copy, {
   startSubtitle: 'v2: локальные экраны и Google sync',
   googleDisabled: 'Google sync доступен после авторизации',
   queueIntro:
